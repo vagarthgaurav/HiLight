@@ -26,6 +26,7 @@ int animLedCount = 0;
 
 bool whiteLedState = false;
 bool whiteLedChanged = false;
+bool rgbLedState = false;
 
 String deviceId;
 
@@ -135,6 +136,7 @@ void setup()
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = color;
     FastLED.show();
+    rgbLedState = true;
   });
 
   pinMode(WHITE_LED_PIN, OUTPUT);
@@ -175,6 +177,7 @@ void loop()
       for (int i = animLedCount; i < targetLeds; i++)
         leds[i] = color;
       FastLED.show();
+      rgbLedState = true;
       animLedCount = targetLeds;
     }
   }
@@ -203,8 +206,15 @@ void loop()
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = CRGB::Black;
         FastLED.show();
-        whiteLedState = !whiteLedState;
-        whiteLedChanged = true;
+        if (rgbLedState)
+        {
+          rgbLedState = false;
+        }
+        else
+        {
+          whiteLedState = !whiteLedState;
+          whiteLedChanged = true;
+        }
       }
 
       buttonPressed = false;
