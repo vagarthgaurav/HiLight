@@ -15,11 +15,41 @@
 #define NUM_LEDS 20
 #define RGB_DATA_PIN 10
 
+#define CLK_PIN 7 // pin 6 connected to rotary encoder CLK (OUT A)
+#define DT_PIN 6  // pin 7 connected to rotary encoder DT (OUT B)
+
 bool buttonPressed = false;
 unsigned long pressStart = 0;
 const unsigned long longPressTime = 2000;
 
 bool whiteLedState = false;
+bool whiteLedChanged = false;
+
+String deviceId;
+
+struct MacColor
+{
+  const char *id; // "HiLight_XX:XX:XX:XX:XX:XX"
+  CRGB color;
+};
+
+const MacColor macColorTable[] = {
+    {"HiLight_7C:2C:67:0B:83:48", CRGB::Red},    // Sabrina & Vagarth
+    {"HiLight_7C:2C:67:0B:9F:F0", CRGB::Green},  // Jutta & Patrick
+    {"HiLight_7C:2C:67:0B:92:08", CRGB::Blue},   // Alexandra & Gabriel
+    {"HiLight_7C:2C:67:0B:93:90", CRGB::Purple}, // Edith & Robert
+};
+const int macColorTableSize = sizeof(macColorTable) / sizeof(macColorTable[0]);
+
+CRGB colorForId(const String &id)
+{
+  for (int i = 0; i < macColorTableSize; i++)
+  {
+    if (id == macColorTable[i].id)
+      return macColorTable[i].color;
+  }
+  return CRGB::LightBlue; // default
+}
 
 const char *ssid = "REDACTED";
 const char *password = "REDACTED";
@@ -34,29 +64,23 @@ MQTTPubSubClient mqtt;
 // Define the array of leds
 CRGB leds[NUM_LEDS];
 
-void toggleWhiteLight()
+void applyWhiteLight()
 {
-  if (whiteLedState == 1)
+  if (whiteLedState)
   {
-
-    Serial.print("White LED state: ");
-    Serial.println(whiteLedState);
-
-    analogWrite(WHITE_LED_PIN, 100);
-    delay(100);
-    for (int i = 0; i <= NUM_LEDS; i++)
-    {
+    // White LED on: turn off RGB strip
+    for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = CRGB::Black;
-      FastLED.show();
-    }
+    FastLED.show();
+    analogWrite(WHITE_LED_PIN, 100);
   }
   else
   {
-    Serial.print("White LED state: ");
-    Serial.println(whiteLedState);
-
+    // White LED off
     analogWrite(WHITE_LED_PIN, 0);
   }
+  Serial.print("White LED state: ");
+  Serial.println(whiteLedState);
 }
 
 void setup()
@@ -66,6 +90,17 @@ void setup()
   FastLED.addLeds<NEOPIXEL, RGB_DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
 
   WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" connected.");
+
+  deviceId = "HiLight_" + WiFi.macAddress();
+  Serial.print("Device ID: ");
+  Serial.println(deviceId);
 
   // Disable certificate validation for testing (or use setCACert for production)
   secureClient.setInsecure();
@@ -77,27 +112,28 @@ void setup()
   // 2. Initialize MQTT over the WebSocket client
   mqtt.begin(webSocket);
 
-  if (mqtt.connect("esp32_client"))
+  if (mqtt.connect(deviceId))
   {
     Serial.println("Connected!");
-    mqtt.publish("client/connected", "Hello MQTT!");
+    mqtt.publish("client/connected", deviceId);
   }
 
   mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
   {
+    if (payload == deviceId) // Ignore messages from self
+      return;
+
     Serial.print("publish/hi: ");
     Serial.println(payload);
 
-    for (int i = 0; i <= NUM_LEDS; i++)
-    {
-      leds[i] = CRGB::LightBlue;
-      FastLED.show();
-      delay(100);
-    }
+    CRGB color = colorForId(payload);
+    for (int i = 0; i < NUM_LEDS; i++)
+      leds[i] = color;
+    FastLED.show();
   });
 
   pinMode(WHITE_LED_PIN, OUTPUT);
-  pinMode(BUTTON_PIN, INPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 }
 
 void loop()
@@ -126,18 +162,25 @@ void loop()
         if (mqtt.isConnected())
         {
           Serial.println("Saying Hi!");
-          mqtt.publish("publish/hi", "vagarth");
+          mqtt.publish("publish/hi", deviceId);
+          whiteLedState = false; // Turn off white LED on long press
+          whiteLedChanged = true;
         }
       }
       else
       {
         Serial.println("Short press");
         whiteLedState = !whiteLedState;
+        whiteLedChanged = true;
       }
 
       buttonPressed = false;
     }
   }
-  toggleWhiteLight();
-  // delay(100);
+
+  if (whiteLedChanged)
+  {
+    applyWhiteLight();
+    whiteLedChanged = false;
+  }
 }
