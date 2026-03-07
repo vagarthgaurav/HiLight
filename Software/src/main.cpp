@@ -28,9 +28,16 @@ bool whiteLedState = false;
 bool whiteLedChanged = false;
 bool rgbLedState = false;
 
+// Logarithmically spaced brightness values (80..250 in 16 steps)
+const uint8_t brightnessLUT[] = {80, 86, 93, 100, 107, 115, 124, 133, 143, 154, 165, 178, 191, 205, 221, 237, 250};
+const int ENCODER_MAX_POS = 16;
+int encoderPos = 0; // starts at minimum (~60)
+int whiteBrightness = brightnessLUT[0];
+int lastClkState = HIGH;
+
 bool hiAnimActive = false;
 unsigned long hiAnimStart = 0;
-const unsigned long HI_FADE_DURATION = 800; // ms per fade in or out (4 phases = 2 full cycles)
+const unsigned long HI_FADE_DURATION = 800; // ms per fade in or out (3 phases: in, out, in)
 
 bool errorAnimActive = false;
 unsigned long errorAnimStart = 0;
@@ -84,7 +91,7 @@ void applyWhiteLight()
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = CRGB::Black;
     FastLED.show();
-    analogWrite(WHITE_LED_PIN, 100);
+    analogWrite(WHITE_LED_PIN, whiteBrightness);
   }
   else
   {
@@ -136,10 +143,10 @@ void setup()
   {
     if (payload == deviceId) // Ignore messages from self
       return;
-
+#ifdef DEBUG_SERIAL
     Serial.print("publish/hi: ");
     Serial.println(payload);
-
+#endif
     whiteLedState = false;
     applyWhiteLight();
 
@@ -155,12 +162,30 @@ void setup()
 
   pinMode(WHITE_LED_PIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(CLK_PIN, INPUT_PULLUP);
+  pinMode(DT_PIN, INPUT_PULLUP);
+  lastClkState = digitalRead(CLK_PIN);
 }
 
 void loop()
 {
   webSocket.loop();
   mqtt.update();
+
+  // Rotary encoder: adjust white LED brightness (logarithmic)
+  int clkState = digitalRead(CLK_PIN);
+  if (lastClkState == HIGH && clkState == LOW)
+  {
+    int newPos = constrain(encoderPos + (digitalRead(DT_PIN) == HIGH ? -1 : 1), 0, ENCODER_MAX_POS);
+    if (newPos != encoderPos)
+    {
+      encoderPos = newPos;
+      whiteBrightness = brightnessLUT[encoderPos];
+      if (whiteLedState)
+        analogWrite(WHITE_LED_PIN, whiteBrightness);
+    }
+  }
+  lastClkState = clkState;
 
   if (digitalRead(BUTTON_PIN) == LOW)
   {
