@@ -21,6 +21,8 @@
 bool buttonPressed = false;
 unsigned long pressStart = 0;
 const unsigned long longPressTime = 2000;
+const unsigned long animStartDelay = 300;
+int animLedCount = 0;
 
 bool whiteLedState = false;
 bool whiteLedChanged = false;
@@ -126,6 +128,9 @@ void setup()
     Serial.print("publish/hi: ");
     Serial.println(payload);
 
+    whiteLedState = false;
+    applyWhiteLight();
+
     CRGB color = colorForId(payload);
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = color;
@@ -147,6 +152,30 @@ void loop()
     {
       buttonPressed = true;
       pressStart = millis();
+      animLedCount = 0;
+    }
+
+    // Animate LEDs filling up sequentially during long press (after initial delay)
+    unsigned long elapsed = millis() - pressStart;
+    int targetLeds =
+        elapsed < animStartDelay
+            ? 0
+            : (int)(((elapsed - animStartDelay) * NUM_LEDS) / (longPressTime - animStartDelay));
+    if (targetLeds > NUM_LEDS)
+      targetLeds = NUM_LEDS;
+
+    if (targetLeds != animLedCount)
+    {
+      if (animLedCount == 0)
+      {
+        whiteLedState = false;
+        applyWhiteLight();
+      }
+      CRGB color = colorForId(deviceId);
+      for (int i = animLedCount; i < targetLeds; i++)
+        leds[i] = color;
+      FastLED.show();
+      animLedCount = targetLeds;
     }
   }
   else
@@ -170,11 +199,16 @@ void loop()
       else
       {
         Serial.println("Short press");
+        // Clear animation LEDs
+        for (int i = 0; i < NUM_LEDS; i++)
+          leds[i] = CRGB::Black;
+        FastLED.show();
         whiteLedState = !whiteLedState;
         whiteLedChanged = true;
       }
 
       buttonPressed = false;
+      animLedCount = 0;
     }
   }
 
