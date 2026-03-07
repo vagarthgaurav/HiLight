@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "secrets.h"
 
 #include <FastLED.h>
 // clang-format off
@@ -29,7 +30,8 @@ bool whiteLedChanged = false;
 bool rgbLedState = false;
 
 // Logarithmically spaced brightness values (80..250 in 16 steps)
-const uint8_t brightnessLUT[] = {80, 86, 93, 100, 107, 115, 124, 133, 143, 154, 165, 178, 191, 205, 221, 237, 250};
+const uint8_t brightnessLUT[] = {80,  86,  93,  100, 107, 115, 124, 133, 143,
+                                 154, 165, 178, 191, 205, 221, 237, 250};
 const int ENCODER_MAX_POS = 16;
 int encoderPos = 0; // starts at minimum (~60)
 int whiteBrightness = brightnessLUT[0];
@@ -70,8 +72,8 @@ CRGB colorForId(const String &id)
   return CRGB::LightBlue; // default
 }
 
-const char *ssid = "REDACTED";
-const char *password = "REDACTED";
+const char *ssid = WIFI_SSID;
+const char *password = WIFI_PASSWORD;
 const char *broker_host = "mqtt.vagarth.dev";
 const int broker_port = 443;
 const char *ws_path = "/mqtt"; // Common path for MQTT over WS
@@ -104,9 +106,8 @@ void applyWhiteLight()
 
 void setup()
 {
-#ifdef DEBUG_SERIAL
+
   Serial.begin(115200);
-#endif
 
   FastLED.addLeds<NEOPIXEL, RGB_DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
 
@@ -143,10 +144,10 @@ void setup()
   {
     if (payload == deviceId) // Ignore messages from self
       return;
-#ifdef DEBUG_SERIAL
+
     Serial.print("publish/hi: ");
     Serial.println(payload);
-#endif
+
     whiteLedState = false;
     applyWhiteLight();
 
