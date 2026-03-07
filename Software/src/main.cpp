@@ -32,6 +32,11 @@ bool hiAnimActive = false;
 unsigned long hiAnimStart = 0;
 const unsigned long HI_FADE_DURATION = 800; // ms per fade in or out (4 phases = 2 full cycles)
 
+bool errorAnimActive = false;
+unsigned long errorAnimStart = 0;
+const unsigned long ERROR_FADE_DURATION = 150; // ms per fade phase (fast)
+const int ERROR_FADE_CYCLES = 3;               // 3 full fade in+out cycles
+
 String deviceId;
 
 struct MacColor
@@ -92,7 +97,9 @@ void applyWhiteLight()
 
 void setup()
 {
+#ifdef DEBUG_SERIAL
   Serial.begin(115200);
+#endif
 
   FastLED.addLeds<NEOPIXEL, RGB_DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
 
@@ -205,6 +212,20 @@ void loop()
           whiteLedState = false; // Turn off white LED on long press
           whiteLedChanged = true;
         }
+        else
+        {
+          Serial.println("No connection — showing error animation");
+          whiteLedState = false;
+          applyWhiteLight();
+          for (int i = 0; i < NUM_LEDS; i++)
+            leds[i] = CRGB::Red;
+          FastLED.setBrightness(0);
+          FastLED.show();
+          hiAnimActive = false;
+          errorAnimActive = true;
+          errorAnimStart = millis();
+          rgbLedState = true;
+        }
       }
       else
       {
@@ -235,6 +256,36 @@ void loop()
   {
     applyWhiteLight();
     whiteLedChanged = false;
+  }
+
+  if (errorAnimActive)
+  {
+    unsigned long elapsed = millis() - errorAnimStart;
+    unsigned long totalDuration = ERROR_FADE_DURATION * ERROR_FADE_CYCLES * 2;
+
+    if (elapsed >= totalDuration)
+    {
+      FastLED.setBrightness(0);
+      FastLED.show();
+      for (int i = 0; i < NUM_LEDS; i++)
+        leds[i] = CRGB::Black;
+      rgbLedState = false;
+      errorAnimActive = false;
+    }
+    else
+    {
+      int phase = elapsed / ERROR_FADE_DURATION;
+      unsigned long phaseElapsed = elapsed % ERROR_FADE_DURATION;
+      uint8_t brightness;
+
+      if (phase % 2 == 0)
+        brightness = (uint8_t)((phaseElapsed * 255) / ERROR_FADE_DURATION); // fade in
+      else
+        brightness = (uint8_t)(255 - (phaseElapsed * 255) / ERROR_FADE_DURATION); // fade out
+
+      FastLED.setBrightness(brightness);
+      FastLED.show();
+    }
   }
 
   if (hiAnimActive)
