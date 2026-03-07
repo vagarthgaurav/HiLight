@@ -28,6 +28,10 @@ bool whiteLedState = false;
 bool whiteLedChanged = false;
 bool rgbLedState = false;
 
+bool hiAnimActive = false;
+unsigned long hiAnimStart = 0;
+const unsigned long HI_FADE_DURATION = 800; // ms per fade in or out (4 phases = 2 full cycles)
+
 String deviceId;
 
 struct MacColor
@@ -135,7 +139,10 @@ void setup()
     CRGB color = colorForId(payload);
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = color;
+    FastLED.setBrightness(0);
     FastLED.show();
+    hiAnimActive = true;
+    hiAnimStart = millis();
     rgbLedState = true;
   });
 
@@ -203,6 +210,8 @@ void loop()
       {
         Serial.println("Short press");
         // Clear animation LEDs
+        hiAnimActive = false;
+        FastLED.setBrightness(255);
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = CRGB::Black;
         FastLED.show();
@@ -226,5 +235,33 @@ void loop()
   {
     applyWhiteLight();
     whiteLedChanged = false;
+  }
+
+  if (hiAnimActive)
+  {
+    unsigned long elapsed = millis() - hiAnimStart;
+    unsigned long totalDuration = HI_FADE_DURATION * 3; // 3 phases: in, out, in, (end solid)
+
+    if (elapsed >= totalDuration)
+    {
+      // Animation done — stay solid
+      FastLED.setBrightness(255);
+      FastLED.show();
+      hiAnimActive = false;
+    }
+    else
+    {
+      int phase = elapsed / HI_FADE_DURATION;
+      unsigned long phaseElapsed = elapsed % HI_FADE_DURATION;
+      uint8_t brightness;
+
+      if (phase % 2 == 0)
+        brightness = (uint8_t)((phaseElapsed * 255) / HI_FADE_DURATION); // fade in
+      else
+        brightness = (uint8_t)(255 - (phaseElapsed * 255) / HI_FADE_DURATION); // fade out
+
+      FastLED.setBrightness(brightness);
+      FastLED.show();
+    }
   }
 }
