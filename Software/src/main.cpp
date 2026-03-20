@@ -113,31 +113,43 @@ void setup()
 
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED)
+  unsigned long wifiStart = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - wifiStart < 5000)
   {
     delay(500);
     Serial.print(".");
   }
-  Serial.println(" connected.");
 
-  deviceId = "HiLight_" + WiFi.macAddress();
-  Serial.print("Device ID: ");
-  Serial.println(deviceId);
-
-  // Disable certificate validation for testing (or use setCACert for production)
-  secureClient.setInsecure();
-
-  // 1. Initialize WebSocket Connection
-  // Port 443 + "true" for SSL (WSS)
-  webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
-
-  // 2. Initialize MQTT over the WebSocket client
-  mqtt.begin(webSocket);
-
-  if (mqtt.connect(deviceId))
+  if (WiFi.status() == WL_CONNECTED)
   {
-    Serial.println("Connected!");
-    mqtt.publish("client/connected", deviceId);
+    Serial.println(" connected.");
+
+    deviceId = "HiLight_" + WiFi.macAddress();
+    Serial.print("Device ID: ");
+    Serial.println(deviceId);
+
+    // Disable certificate validation for testing (or use setCACert for production)
+    secureClient.setInsecure();
+
+    // 1. Initialize WebSocket Connection
+    // Port 443 + "true" for SSL (WSS)
+    webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
+
+    // 2. Initialize MQTT over the WebSocket client
+    mqtt.begin(webSocket);
+
+    if (mqtt.connect(deviceId))
+    {
+      Serial.println("Connected!");
+      mqtt.publish("client/connected", deviceId);
+    }
+  }
+  else
+  {
+    Serial.println(" WiFi connection timed out, continuing without WiFi.");
+    deviceId = "HiLight_" + WiFi.macAddress();
+    Serial.print("Device ID: ");
+    Serial.println(deviceId);
   }
 
   mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
