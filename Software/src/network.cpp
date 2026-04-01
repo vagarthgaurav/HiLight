@@ -9,6 +9,7 @@
 #include <WebSocketsClient.h>
 #include <MQTTPubSubClient.h>
 // clang-format on
+#include <DNSServer.h>
 #include <Preferences.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -18,6 +19,7 @@ static const char *broker_host = "mqtt.vagarth.dev";
 static const int broker_port = 443;
 static const char *ws_path = "/mqtt";
 
+static DNSServer dnsServer;
 static WiFiClientSecure secureClient;
 static WebSocketsClient webSocket;
 static MQTTPubSubClient mqtt;
@@ -35,7 +37,9 @@ static unsigned long lastWifiAttempt = 0;
 static bool apModeActive = false;
 static bool shouldExitAP = false;
 
-static const char *AP_SETUP_PAGE = R"(<!DOCTYPE html>
+static String buildSetupPage(const String &scanOptions)
+{
+  return String(R"HTML(<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -44,7 +48,9 @@ static const char *AP_SETUP_PAGE = R"(<!DOCTYPE html>
 body{font-family:sans-serif;max-width:380px;margin:60px auto;padding:20px}
 h2{color:#ff8c00}
 label{display:block;margin:12px 0 4px;font-size:14px}
-input{width:100%;padding:10px;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;font-size:16px}
+select,input[type=text],input[type=password]{width:100%;padding:10px;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;font-size:16px}
+.radio-row{display:flex;gap:16px;margin:12px 0 8px}
+.radio-row label{margin:0;display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}
 button{margin-top:20px;width:100%;padding:12px;background:#ff8c00;color:white;border:none;border-radius:4px;font-size:16px;cursor:pointer}
 button:active{background:#cc7000}
 </style>
@@ -53,13 +59,31 @@ button:active{background:#cc7000}
 <h2>HiLight WiFi Setup</h2>
 <form method="POST" action="/save">
 <label>WiFi Network (SSID)</label>
-<input type="text" name="ssid" placeholder="Network name" autocomplete="off">
+<div class="radio-row">
+<label><input type="radio" name="ssid_mode" value="list" checked onchange="toggle(this)"> Choose from list</label>
+<label><input type="radio" name="ssid_mode" value="manual" onchange="toggle(this)"> Enter manually</label>
+</div>
+<select id="ssid_sel" onchange="document.getElementById('ssid_in').value=this.value">
+)HTML") + scanOptions + R"HTML(</select>
+<input type="hidden" name="ssid" id="ssid_in">
+<input type="text" id="ssid_manual" placeholder="Network name" autocomplete="off" style="display:none">
 <label>Password</label>
 <input type="password" name="password" placeholder="Password">
 <button type="submit">Save &amp; Connect</button>
 </form>
+<script>
+var sel=document.getElementById('ssid_sel');
+var manual=document.getElementById('ssid_manual');
+var hidden=document.getElementById('ssid_in');
+sel.dispatchEvent(new Event('change'));
+function toggle(r){
+  if(r.value==='manual'){sel.style.display='none';manual.style.display='block';manual.name='ssid';hidden.name='';}
+  else{sel.style.display='block';manual.style.display='none';manual.name='';hidden.name='ssid';sel.dispatchEvent(new Event('change'));}
+}
+</script>
 </body>
-</html>)";
+</html>)HTML";
+}
 
 static const char *AP_SAVED_PAGE = R"(<!DOCTYPE html>
 <html>
@@ -129,7 +153,22 @@ void initNetwork()
 void startAPMode()
 {
   WiFi.disconnect();
-  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP_STA);
+
+  Serial.println("Scanning for WiFi networks...");
+  int n = WiFi.scanNetworks();
+  String scanOptions = "";
+  for (int i = 0; i < n; i++)
+  {
+    String ssid = WiFi.SSID(i);
+    ssid.replace("\"", "&quot;");
+    scanOptions += "<option value=\"" + ssid + "\">" + ssid + "</option>\n";
+  }
+  WiFi.scanDelete();
+  Serial.print("Found ");
+  Serial.print(n);
+  Serial.println(" networks.");
+
   String apSSID = "HiLight-Setup";
   WiFi.softAP(apSSID.c_str());
   Serial.print("AP Mode started. SSID: ");
@@ -137,7 +176,19 @@ void startAPMode()
   Serial.print("AP IP: ");
   Serial.println(WiFi.softAPIP());
 
-  webServer.on("/", HTTP_GET, []() { webServer.send(200, "text/html", AP_SETUP_PAGE); });
+  dnsServer.start(53, "*", WiFi.softAPIP());
+
+  String setupPage = buildSetupPage(scanOptions);
+  webServer.on("/", HTTP_GET, [setupPage]() { webServer.send(200, "text/html", setupPage); });
+
+  // Captive portal detection — redirect OS connectivity checks to the setup page
+  auto captiveRedirect = []() { webServer.sendHeader("Location", "http://hi-light-setup", true); webServer.send(302, "text/plain", ""); };
+  webServer.on("/generate_204", HTTP_GET, captiveRedirect);          // Android
+  webServer.on("/hotspot-detect.html", HTTP_GET, captiveRedirect);   // iOS / macOS
+  webServer.on("/library/test/success.html", HTTP_GET, captiveRedirect);
+  webServer.on("/connecttest.txt", HTTP_GET, captiveRedirect);       // Windows
+  webServer.on("/ncsi.txt", HTTP_GET, captiveRedirect);
+  webServer.onNotFound([captiveRedirect]() { captiveRedirect(); });  // Catch-all
 
   webServer.on("/save", HTTP_POST, []()
   {
@@ -169,6 +220,7 @@ bool isAPMode()
 
 static void exitAPMode()
 {
+  dnsServer.stop();
   webServer.stop();
   apModeActive = false;
   WiFi.softAPdisconnect(true);
@@ -187,6 +239,7 @@ void updateNetwork()
 {
   if (apModeActive)
   {
+    dnsServer.processNextRequest();
     webServer.handleClient();
     if (shouldExitAP)
     {
