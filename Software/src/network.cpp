@@ -65,7 +65,8 @@ button:active{background:#cc7000}
 <label><input type="radio" name="ssid_mode" value="manual" onchange="toggle(this)"> Enter manually</label>
 </div>
 <select id="ssid_sel" onchange="document.getElementById('ssid_in').value=this.value">
-)HTML") + scanOptions + R"HTML(</select>
+)HTML") + scanOptions +
+         R"HTML(</select>
 <input type="hidden" name="ssid" id="ssid_in">
 <input type="text" id="ssid_manual" placeholder="Network name" autocomplete="off" style="display:none">
 <label>Password</label>
@@ -143,11 +144,15 @@ static void setupMQTT()
       Serial.print("OTA update requested from: ");
       Serial.println(url);
 
-      // Flash all LEDs white to indicate OTA in progress
-      for (int i = 0; i < NUM_LEDS; i++)
-        leds[i] = CRGB::White;
-      FastLED.setBrightness(128);
-      FastLED.show();
+      startOTAAnim();
+      httpUpdate.onProgress([](int current, int total) { advanceOTASpinner(); });
+      httpUpdate.onEnd([]()
+      {
+        FastLED.setBrightness(0);
+        for (int i = 0; i < NUM_LEDS; i++)
+          leds[i] = CRGB::Black;
+        FastLED.show();
+      });
 
       WiFiClientSecure otaClient;
       otaClient.setInsecure();
@@ -204,13 +209,17 @@ void startAPMode()
   webServer.on("/", HTTP_GET, [setupPage]() { webServer.send(200, "text/html", setupPage); });
 
   // Captive portal detection — redirect OS connectivity checks to the setup page
-  auto captiveRedirect = []() { webServer.sendHeader("Location", "http://hi-light-setup", true); webServer.send(302, "text/plain", ""); };
-  webServer.on("/generate_204", HTTP_GET, captiveRedirect);          // Android
-  webServer.on("/hotspot-detect.html", HTTP_GET, captiveRedirect);   // iOS / macOS
+  auto captiveRedirect = []()
+  {
+    webServer.sendHeader("Location", "http://hi-light-setup", true);
+    webServer.send(302, "text/plain", "");
+  };
+  webServer.on("/generate_204", HTTP_GET, captiveRedirect);        // Android
+  webServer.on("/hotspot-detect.html", HTTP_GET, captiveRedirect); // iOS / macOS
   webServer.on("/library/test/success.html", HTTP_GET, captiveRedirect);
-  webServer.on("/connecttest.txt", HTTP_GET, captiveRedirect);       // Windows
+  webServer.on("/connecttest.txt", HTTP_GET, captiveRedirect); // Windows
   webServer.on("/ncsi.txt", HTTP_GET, captiveRedirect);
-  webServer.onNotFound([captiveRedirect]() { captiveRedirect(); });  // Catch-all
+  webServer.onNotFound([captiveRedirect]() { captiveRedirect(); }); // Catch-all
 
   webServer.on("/save", HTTP_POST, []()
   {

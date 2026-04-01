@@ -20,6 +20,12 @@ unsigned long errorAnimStart = 0;
 bool apAnimActive = false;
 static unsigned long apAnimStart = 0;
 
+static int otaSpinPos = 0;
+static int otaProgressCount = 0;
+
+static const CRGB OTA_BG_COLOR = CRGB(255, 220, 60); // light yellow
+static const CRGB OTA_SPIN_COLOR = CRGB(160, 90, 0); // darker amber-yellow
+
 void applyWhiteLight()
 {
   if (whiteLedState)
@@ -124,6 +130,41 @@ void updateAPAnim()
     brightness = (uint8_t)(255 - ((elapsed - AP_FADE_DURATION) * 255) / AP_FADE_DURATION);
 
   FastLED.setBrightness(brightness);
+  FastLED.show();
+}
+
+void startOTAAnim()
+{
+  whiteLedState = false;
+  applyWhiteLight();
+  hiAnimActive = false;
+  errorAnimActive = false;
+  apAnimActive = false;
+  otaSpinPos = 0;
+  otaProgressCount = 0;
+
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = OTA_BG_COLOR;
+  // Place 4 consecutive spinner LEDs
+  for (int s = 0; s < 4; s++)
+    leds[(otaSpinPos + s) % NUM_LEDS] = OTA_SPIN_COLOR;
+  FastLED.setBrightness(200);
+  FastLED.show();
+  rgbLedState = true;
+}
+
+void advanceOTASpinner()
+{
+  otaProgressCount++;
+  if (otaProgressCount < OTA_SPIN_STEP)
+    return;
+  otaProgressCount = 0;
+
+  otaSpinPos = (otaSpinPos + 1) % NUM_LEDS;
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = OTA_BG_COLOR;
+  for (int s = 0; s < 4; s++)
+    leds[(otaSpinPos + s) % NUM_LEDS] = OTA_SPIN_COLOR;
   FastLED.show();
 }
 

@@ -23,5 +23,8 @@
 #define ERROR_FADE_CYCLES 3       // full fade in+out cycles
 #define AP_FADE_DURATION 1500UL   // ms per fade phase (slow orange pulse)
 
+// OTA animation
+#define OTA_SPIN_STEP 1 // progress callbacks to skip between spinner advances
+
 // Encoder
 #define ENCODER_MAX_POS 16

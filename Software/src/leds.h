@@ -1,7 +1,7 @@
 #pragma once
+#include "config.h"
 #include <Arduino.h>
 #include <FastLED.h>
-#include "config.h"
 
 extern CRGB leds[NUM_LEDS];
 
@@ -30,3 +30,5 @@ void updateErrorAnim();
 void startAPAnim();
 void stopAPAnim();
 void updateAPAnim();
+void startOTAAnim();
+void advanceOTASpinner();
