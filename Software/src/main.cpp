@@ -86,7 +86,7 @@ void loop()
         CRGB bgColor = colorForId(deviceId);
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = bgColor;
-        FastLED.setBrightness(50);
+        FastLED.setBrightness(200);
         rgbLedState = true;
       }
 
@@ -122,7 +122,11 @@ void loop()
           Serial.println("Saying Hi!");
           publishHi();
           whiteLedState = false;
-          whiteLedChanged = true;
+          CRGB bgColor = colorForId(deviceId);
+          for (int i = 0; i < NUM_LEDS; i++)
+            leds[i] = bgColor;
+          FastLED.setBrightness(200);
+          FastLED.show();
         }
         else
         {
