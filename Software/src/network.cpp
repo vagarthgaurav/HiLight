@@ -38,6 +38,8 @@ static unsigned long lastWifiAttempt = 0;
 static bool apModeActive = false;
 static bool shouldExitAP = false;
 
+static bool mqttConnected = false;
+
 static String buildSetupPage(const String &scanOptions)
 {
   return String(R"HTML(<!DOCTYPE html>
@@ -108,6 +110,57 @@ static void loadCredentials()
   prefs.end();
 }
 
+static void onMqttConnect()
+{
+  Serial.println("MQTT connected!");
+  mqtt.publish("client/connected", deviceId);
+  mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
+  {
+    if (payload == deviceId) // Ignore messages from self
+      return;
+
+    Serial.print("publish/hi: ");
+    Serial.println(payload);
+
+    whiteLedState = false;
+    applyWhiteLight();
+
+    CRGB color = colorForId(payload);
+    for (int i = 0; i < NUM_LEDS; i++)
+      leds[i] = color;
+    FastLED.setBrightness(0);
+    FastLED.show();
+    hiAnimActive = true;
+    hiAnimStart = millis();
+    rgbLedState = true;
+  });
+
+  mqtt.subscribe("hilight/ota", [](const String &url, const size_t size)
+  {
+    Serial.print("OTA update requested from: ");
+    Serial.println(url);
+
+    startOTAAnim();
+    httpUpdate.onProgress([](int current, int total) { advanceOTASpinner(); });
+    httpUpdate.onEnd([]()
+    {
+      FastLED.setBrightness(0);
+      for (int i = 0; i < NUM_LEDS; i++)
+        leds[i] = CRGB::Black;
+      FastLED.show();
+    });
+
+    WiFiClientSecure otaClient;
+    otaClient.setInsecure();
+    t_httpUpdate_return result = httpUpdate.update(otaClient, url);
+
+    // Only reached on failure (success reboots the device)
+    Serial.print("OTA failed: ");
+    Serial.println(httpUpdate.getLastErrorString());
+    startErrorAnim();
+  });
+}
+
 static void setupMQTT()
 {
   secureClient.setInsecure();
@@ -116,53 +169,8 @@ static void setupMQTT()
 
   if (mqtt.connect(deviceId))
   {
-    Serial.println("MQTT connected!");
-    mqtt.publish("client/connected", deviceId);
-    mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
-    {
-      if (payload == deviceId) // Ignore messages from self
-        return;
-
-      Serial.print("publish/hi: ");
-      Serial.println(payload);
-
-      whiteLedState = false;
-      applyWhiteLight();
-
-      CRGB color = colorForId(payload);
-      for (int i = 0; i < NUM_LEDS; i++)
-        leds[i] = color;
-      FastLED.setBrightness(0);
-      FastLED.show();
-      hiAnimActive = true;
-      hiAnimStart = millis();
-      rgbLedState = true;
-    });
-
-    mqtt.subscribe("hilight/ota", [](const String &url, const size_t size)
-    {
-      Serial.print("OTA update requested from: ");
-      Serial.println(url);
-
-      startOTAAnim();
-      httpUpdate.onProgress([](int current, int total) { advanceOTASpinner(); });
-      httpUpdate.onEnd([]()
-      {
-        FastLED.setBrightness(0);
-        for (int i = 0; i < NUM_LEDS; i++)
-          leds[i] = CRGB::Black;
-        FastLED.show();
-      });
-
-      WiFiClientSecure otaClient;
-      otaClient.setInsecure();
-      t_httpUpdate_return result = httpUpdate.update(otaClient, url);
-
-      // Only reached on failure (success reboots the device)
-      Serial.print("OTA failed: ");
-      Serial.println(httpUpdate.getLastErrorString());
-      startErrorAnim();
-    });
+    mqttConnected = true;
+    onMqttConnect();
   }
 }
 
@@ -306,6 +314,17 @@ void updateNetwork()
   {
     webSocket.loop();
     mqtt.update();
+
+    bool nowConnected = mqtt.isConnected();
+    if (nowConnected && !mqttConnected)
+    {
+      mqttConnected = true;
+      onMqttConnect();
+    }
+    else if (!nowConnected)
+    {
+      mqttConnected = false;
+    }
   }
   else if (millis() - lastWifiAttempt >= WIFI_RETRY_INTERVAL)
   {
