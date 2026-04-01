@@ -10,6 +10,7 @@
 #include <MQTTPubSubClient.h>
 // clang-format on
 #include <DNSServer.h>
+#include <HTTPUpdate.h>
 #include <Preferences.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -135,6 +136,27 @@ static void setupMQTT()
       hiAnimActive = true;
       hiAnimStart = millis();
       rgbLedState = true;
+    });
+
+    mqtt.subscribe("hilight/ota", [](const String &url, const size_t size)
+    {
+      Serial.print("OTA update requested from: ");
+      Serial.println(url);
+
+      // Flash all LEDs white to indicate OTA in progress
+      for (int i = 0; i < NUM_LEDS; i++)
+        leds[i] = CRGB::White;
+      FastLED.setBrightness(128);
+      FastLED.show();
+
+      WiFiClientSecure otaClient;
+      otaClient.setInsecure();
+      t_httpUpdate_return result = httpUpdate.update(otaClient, url);
+
+      // Only reached on failure (success reboots the device)
+      Serial.print("OTA failed: ");
+      Serial.println(httpUpdate.getLastErrorString());
+      startErrorAnim();
     });
   }
 }
