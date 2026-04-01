@@ -1,5 +1,5 @@
-#include <Arduino.h>
 #include "secrets.h"
+#include <Arduino.h>
 
 #include <FastLED.h>
 // clang-format off
@@ -43,10 +43,17 @@ const unsigned long HI_FADE_DURATION = 800; // ms per fade in or out (3 phases: 
 
 bool errorAnimActive = false;
 unsigned long errorAnimStart = 0;
-const unsigned long ERROR_FADE_DURATION = 150; // ms per fade phase (fast)
+const unsigned long ERROR_FADE_DURATION = 350; // ms per fade phase (fast)
 const int ERROR_FADE_CYCLES = 3;               // 3 full fade in+out cycles
 
 String deviceId;
+
+unsigned long lastWifiAttempt = 0;
+const unsigned long WIFI_RETRY_INTERVAL = 5UL * 60UL * 1000UL; // 5 minutes
+
+bool wifiConnecting = false;
+unsigned long wifiConnectStart = 0;
+bool firstWifiAttempt = true;
 
 struct MacColor
 {
@@ -85,6 +92,55 @@ MQTTPubSubClient mqtt;
 // Define the array of leds
 CRGB leds[NUM_LEDS];
 
+void applyWhiteLight(); // forward declaration
+
+void startErrorAnim()
+{
+  whiteLedState = false;
+  applyWhiteLight();
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = CRGB::Red;
+  FastLED.setBrightness(0);
+  FastLED.show();
+  hiAnimActive = false;
+  errorAnimActive = true;
+  errorAnimStart = millis();
+  rgbLedState = true;
+}
+
+void setupMQTT()
+{
+  secureClient.setInsecure();
+  webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
+  mqtt.begin(webSocket);
+
+  if (mqtt.connect(deviceId))
+  {
+    Serial.println("MQTT connected!");
+    mqtt.publish("client/connected", deviceId);
+    mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
+    {
+      if (payload == deviceId) // Ignore messages from self
+        return;
+
+      Serial.print("publish/hi: ");
+      Serial.println(payload);
+
+      whiteLedState = false;
+      applyWhiteLight();
+
+      CRGB color = colorForId(payload);
+      for (int i = 0; i < NUM_LEDS; i++)
+        leds[i] = color;
+      FastLED.setBrightness(0);
+      FastLED.show();
+      hiAnimActive = true;
+      hiAnimStart = millis();
+      rgbLedState = true;
+    });
+  }
+}
+
 void applyWhiteLight()
 {
   if (whiteLedState)
@@ -112,66 +168,11 @@ void setup()
   FastLED.addLeds<NEOPIXEL, RGB_DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
 
   WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi");
-  unsigned long wifiStart = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - wifiStart < 5000)
-  {
-    delay(500);
-    Serial.print(".");
-  }
-
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    Serial.println(" connected.");
-
-    deviceId = "HiLight_" + WiFi.macAddress();
-    Serial.print("Device ID: ");
-    Serial.println(deviceId);
-
-    // Disable certificate validation for testing (or use setCACert for production)
-    secureClient.setInsecure();
-
-    // 1. Initialize WebSocket Connection
-    // Port 443 + "true" for SSL (WSS)
-    webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
-
-    // 2. Initialize MQTT over the WebSocket client
-    mqtt.begin(webSocket);
-
-    if (mqtt.connect(deviceId))
-    {
-      Serial.println("Connected!");
-      mqtt.publish("client/connected", deviceId);
-    }
-  }
-  else
-  {
-    Serial.println(" WiFi connection timed out, continuing without WiFi.");
-    deviceId = "HiLight_" + WiFi.macAddress();
-    Serial.print("Device ID: ");
-    Serial.println(deviceId);
-  }
-
-  mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
-  {
-    if (payload == deviceId) // Ignore messages from self
-      return;
-
-    Serial.print("publish/hi: ");
-    Serial.println(payload);
-
-    whiteLedState = false;
-    applyWhiteLight();
-
-    CRGB color = colorForId(payload);
-    for (int i = 0; i < NUM_LEDS; i++)
-      leds[i] = color;
-    FastLED.setBrightness(0);
-    FastLED.show();
-    hiAnimActive = true;
-    hiAnimStart = millis();
-    rgbLedState = true;
-  });
+  deviceId = "HiLight_" + WiFi.macAddress();
+  Serial.print("Device ID: ");
+  Serial.println(deviceId);
+  wifiConnecting = true;
+  wifiConnectStart = millis();
 
   pinMode(WHITE_LED_PIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -182,8 +183,40 @@ void setup()
 
 void loop()
 {
-  webSocket.loop();
-  mqtt.update();
+  if (wifiConnecting)
+  {
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      wifiConnecting = false;
+      lastWifiAttempt = millis();
+      Serial.println("WiFi connected.");
+      setupMQTT();
+      firstWifiAttempt = false;
+    }
+    else if (millis() - wifiConnectStart >= 5000)
+    {
+      wifiConnecting = false;
+      lastWifiAttempt = millis();
+      Serial.println("WiFi connection timed out, will retry in 5 minutes.");
+      if (firstWifiAttempt)
+      {
+        firstWifiAttempt = false;
+        startErrorAnim();
+      }
+    }
+  }
+  else if (WiFi.status() == WL_CONNECTED)
+  {
+    webSocket.loop();
+    mqtt.update();
+  }
+  else if (millis() - lastWifiAttempt >= WIFI_RETRY_INTERVAL)
+  {
+    Serial.println("Retrying WiFi connection...");
+    WiFi.begin(ssid, password);
+    wifiConnecting = true;
+    wifiConnectStart = millis();
+  }
 
   // Rotary encoder: adjust white LED brightness (logarithmic)
   int clkState = digitalRead(CLK_PIN);
@@ -253,16 +286,7 @@ void loop()
         else
         {
           Serial.println("No connection — showing error animation");
-          whiteLedState = false;
-          applyWhiteLight();
-          for (int i = 0; i < NUM_LEDS; i++)
-            leds[i] = CRGB::Red;
-          FastLED.setBrightness(0);
-          FastLED.show();
-          hiAnimActive = false;
-          errorAnimActive = true;
-          errorAnimStart = millis();
-          rgbLedState = true;
+          startErrorAnim();
         }
       }
       else
