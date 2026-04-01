@@ -57,16 +57,16 @@ void loop()
     {
       buttonPressed = true;
       pressStart = millis();
-      animLedCount = 0;
+      animLedCount = -1;
     }
 
-    // Animate LEDs filling up sequentially during long press (after initial delay)
+    // Animate spinner during long press (after initial delay): background color + darker spin
     unsigned long elapsed = millis() - pressStart;
-    int targetLeds = elapsed < ANIM_START_DELAY ? 0
-                                                : (int)(((elapsed - ANIM_START_DELAY) * NUM_LEDS) /
-                                                        (LONG_PRESS_TIME - ANIM_START_DELAY));
-    if (targetLeds > NUM_LEDS)
-      targetLeds = NUM_LEDS;
+    int targetSpinPos = elapsed < ANIM_START_DELAY
+                            ? -1
+                            : min((int)(((elapsed - ANIM_START_DELAY) * (NUM_LEDS - 4)) /
+                                        (LONG_PRESS_TIME - ANIM_START_DELAY)),
+                                  NUM_LEDS - 4);
 
     if (!apModeTriggered && elapsed >= AP_PRESS_TIME)
     {
@@ -76,19 +76,35 @@ void loop()
       apModeTriggered = true;
     }
 
-    if (targetLeds != animLedCount)
+    if (targetSpinPos != animLedCount)
     {
-      if (animLedCount == 0)
+      if (animLedCount == -1)
       {
+        // First frame: set background and brightness
         whiteLedState = false;
         applyWhiteLight();
+        CRGB bgColor = colorForId(deviceId);
+        for (int i = 0; i < NUM_LEDS; i++)
+          leds[i] = bgColor;
+        FastLED.setBrightness(50);
+        rgbLedState = true;
       }
-      CRGB color = colorForId(deviceId);
-      for (int i = animLedCount; i < targetLeds; i++)
-        leds[i] = color;
-      FastLED.show();
-      rgbLedState = true;
-      animLedCount = targetLeds;
+
+      if (targetSpinPos >= 0)
+      {
+        CRGB bgColor = colorForId(deviceId);
+        CRGB spColor = spinColorForId(deviceId);
+        // Restore previous spinner position to background
+        if (animLedCount >= 0)
+          for (int s = 0; s < 4; s++)
+            leds[animLedCount + s] = bgColor;
+        // Draw spinner at new position
+        for (int s = 0; s < 4; s++)
+          leds[targetSpinPos + s] = spColor;
+        FastLED.show();
+      }
+
+      animLedCount = targetSpinPos;
     }
   }
   else
@@ -135,7 +151,7 @@ void loop()
       }
 
       buttonPressed = false;
-      animLedCount = 0;
+      animLedCount = -1;
       apModeTriggered = false;
     }
   }
