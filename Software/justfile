@@ -1,0 +1,20 @@
+pio := "/home/vagarth/.platformio/penv/bin/pio"
+
+build:
+    {{pio}} run
+
+upload:
+    {{pio}} run --target upload
+
+monitor:
+    {{pio}} device monitor
+
+upload-monitor:
+    {{pio}} run --target upload && {{pio}} device monitor
+
+deploy:
+    {{pio}} run
+    scp .pio/build/esp32-c3-devkitc-02/firmware.bin vagarth@meisen-server:/home/vagarth/hi-light-firmware/firmware.bin
+
+ota:
+    mqttx pub -h mqtt.vagarth.dev -p 443 -l wss --path /mqtt -t "hilight/ota" -m "https://hi-light-fw.vagarth.dev/firmware.bin"
