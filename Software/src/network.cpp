@@ -39,6 +39,9 @@ static bool apModeActive = false;
 static bool shouldExitAP = false;
 
 static bool mqttConnected = false;
+static unsigned long lastMqttAttempt = 0;
+
+static String pendingOtaUrl = "";
 
 static String buildSetupPage(const String &scanOptions)
 {
@@ -137,27 +140,8 @@ static void onMqttConnect()
 
   mqtt.subscribe("hilight/ota", [](const String &url, const size_t size)
   {
-    Serial.print("OTA update requested from: ");
-    Serial.println(url);
-
-    startOTAAnim();
-    httpUpdate.onProgress([](int current, int total) { advanceOTASpinner(); });
-    httpUpdate.onEnd([]()
-    {
-      FastLED.setBrightness(0);
-      for (int i = 0; i < NUM_LEDS; i++)
-        leds[i] = CRGB::Black;
-      FastLED.show();
-    });
-
-    WiFiClientSecure otaClient;
-    otaClient.setInsecure();
-    t_httpUpdate_return result = httpUpdate.update(otaClient, url);
-
-    // Only reached on failure (success reboots the device)
-    Serial.print("OTA failed: ");
-    Serial.println(httpUpdate.getLastErrorString());
-    startErrorAnim();
+    if (url.length() > 0)
+      pendingOtaUrl = url;
   });
 }
 
@@ -315,6 +299,43 @@ void updateNetwork()
     webSocket.loop();
     mqtt.update();
 
+    if (pendingOtaUrl.length() > 0)
+    {
+      String url = pendingOtaUrl;
+      pendingOtaUrl = "";
+
+      Serial.print("OTA update requested from: ");
+      Serial.println(url);
+
+      // Clear the retained message on the broker before starting the download
+      // so the device does not re-trigger OTA with the stale URL after reboot
+      mqtt.publish("hilight/ota", (uint8_t *)"", 0, true, 0);
+
+      startOTAAnim();
+      httpUpdate.onProgress([](int current, int total) { advanceOTASpinner(); });
+      httpUpdate.onEnd([]()
+      {
+        FastLED.setBrightness(0);
+        for (int i = 0; i < NUM_LEDS; i++)
+          leds[i] = CRGB::Black;
+        FastLED.show();
+      });
+
+      WiFiClientSecure otaClient;
+      otaClient.setInsecure();
+      t_httpUpdate_return result = httpUpdate.update(otaClient, url);
+
+      if (result == HTTP_UPDATE_FAILED)
+      {
+        Serial.print("OTA failed: ");
+        Serial.println(httpUpdate.getLastErrorString());
+        startErrorAnim();
+      }
+      // HTTP_UPDATE_NO_UPDATES: silently ignore (not an error)
+      // HTTP_UPDATE_OK: device was rebooted by httpUpdate, never reached
+      return;
+    }
+
     bool nowConnected = mqtt.isConnected();
     if (nowConnected && !mqttConnected)
     {
@@ -324,6 +345,13 @@ void updateNetwork()
     else if (!nowConnected)
     {
       mqttConnected = false;
+      if (millis() - lastMqttAttempt >= MQTT_RETRY_INTERVAL)
+      {
+        lastMqttAttempt = millis();
+        Serial.println("MQTT disconnected, reconnecting...");
+        webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
+        mqtt.connect(deviceId);
+      }
     }
   }
   else if (millis() - lastWifiAttempt >= WIFI_RETRY_INTERVAL)
