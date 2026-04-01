@@ -21,8 +21,12 @@ extern bool hiAnimActive;
 extern unsigned long hiAnimStart;
 extern bool errorAnimActive;
 extern unsigned long errorAnimStart;
+extern bool apAnimActive;
 
 void applyWhiteLight();
 void startErrorAnim();
 void updateHiAnim();
 void updateErrorAnim();
+void startAPAnim();
+void stopAPAnim();
+void updateAPAnim();

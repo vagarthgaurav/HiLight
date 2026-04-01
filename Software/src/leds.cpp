@@ -8,7 +8,7 @@ bool rgbLedState = false;
 
 // Logarithmically spaced brightness values (80..250 in 17 steps)
 const uint8_t brightnessLUT[] = {80,  86,  93,  100, 107, 115, 124, 133, 143,
-                                  154, 165, 178, 191, 205, 221, 237, 250};
+                                 154, 165, 178, 191, 205, 221, 237, 250};
 int encoderPos = 0;
 int whiteBrightness = brightnessLUT[0];
 int lastClkState = HIGH;
@@ -17,6 +17,8 @@ bool hiAnimActive = false;
 unsigned long hiAnimStart = 0;
 bool errorAnimActive = false;
 unsigned long errorAnimStart = 0;
+bool apAnimActive = false;
+static unsigned long apAnimStart = 0;
 
 void applyWhiteLight()
 {
@@ -82,6 +84,47 @@ void updateErrorAnim()
     FastLED.setBrightness(brightness);
     FastLED.show();
   }
+}
+
+void startAPAnim()
+{
+  whiteLedState = false;
+  applyWhiteLight();
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = CRGB::Orange;
+  FastLED.setBrightness(0);
+  FastLED.show();
+  hiAnimActive = false;
+  errorAnimActive = false;
+  apAnimActive = true;
+  apAnimStart = millis();
+  rgbLedState = true;
+}
+
+void stopAPAnim()
+{
+  apAnimActive = false;
+  FastLED.setBrightness(0);
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = CRGB::Black;
+  FastLED.show();
+  rgbLedState = false;
+}
+
+void updateAPAnim()
+{
+  if (!apAnimActive)
+    return;
+
+  unsigned long elapsed = (millis() - apAnimStart) % (AP_FADE_DURATION * 2);
+  uint8_t brightness;
+  if (elapsed < AP_FADE_DURATION)
+    brightness = (uint8_t)((elapsed * 255) / AP_FADE_DURATION);
+  else
+    brightness = (uint8_t)(255 - ((elapsed - AP_FADE_DURATION) * 255) / AP_FADE_DURATION);
+
+  FastLED.setBrightness(brightness);
+  FastLED.show();
 }
 
 void updateHiAnim()

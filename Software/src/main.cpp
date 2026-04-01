@@ -9,6 +9,7 @@
 static bool buttonPressed = false;
 static unsigned long pressStart = 0;
 static int animLedCount = 0;
+static bool apModeTriggered = false;
 
 void setup()
 {
@@ -28,6 +29,12 @@ void setup()
 void loop()
 {
   updateNetwork();
+
+  if (isAPMode())
+  {
+    updateAPAnim();
+    return;
+  }
 
   // Rotary encoder: adjust white LED brightness (logarithmic)
   int clkState = digitalRead(CLK_PIN);
@@ -55,12 +62,19 @@ void loop()
 
     // Animate LEDs filling up sequentially during long press (after initial delay)
     unsigned long elapsed = millis() - pressStart;
-    int targetLeds =
-        elapsed < ANIM_START_DELAY
-            ? 0
-            : (int)(((elapsed - ANIM_START_DELAY) * NUM_LEDS) / (LONG_PRESS_TIME - ANIM_START_DELAY));
+    int targetLeds = elapsed < ANIM_START_DELAY ? 0
+                                                : (int)(((elapsed - ANIM_START_DELAY) * NUM_LEDS) /
+                                                        (LONG_PRESS_TIME - ANIM_START_DELAY));
     if (targetLeds > NUM_LEDS)
       targetLeds = NUM_LEDS;
+
+    if (!apModeTriggered && elapsed >= AP_PRESS_TIME)
+    {
+      Serial.println("5s hold — entering AP mode");
+      startAPMode();
+      startAPAnim();
+      apModeTriggered = true;
+    }
 
     if (targetLeds != animLedCount)
     {
@@ -122,6 +136,7 @@ void loop()
 
       buttonPressed = false;
       animLedCount = 0;
+      apModeTriggered = false;
     }
   }
 
