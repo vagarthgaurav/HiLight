@@ -47,6 +47,7 @@ void loop()
       whiteBrightness = brightnessLUT[encoderPos];
       if (whiteLedState)
         analogWrite(WHITE_LED_PIN, whiteBrightness);
+      publishBrightnessState();
     }
   }
   lastClkState = clkState;
@@ -151,6 +152,7 @@ void loop()
         {
           whiteLedState = !whiteLedState;
           whiteLedChanged = true;
+          publishPowerState();
         }
       }
 

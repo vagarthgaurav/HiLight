@@ -143,6 +143,34 @@ static void onMqttConnect()
     if (url.length() > 0)
       pendingOtaUrl = url;
   });
+
+  mqtt.subscribe("hilight/" + deviceId + "/power", [](const String &payload, const size_t size)
+  {
+    if (payload != "ON" && payload != "OFF")
+      return;
+
+    hiAnimActive = false;
+    rgbLedState = false;
+    for (int i = 0; i < NUM_LEDS; i++)
+      leds[i] = CRGB::Black;
+    FastLED.show();
+
+    whiteLedState = (payload == "ON");
+    whiteLedChanged = true;
+    publishPowerState();
+  });
+
+  mqtt.subscribe("hilight/" + deviceId + "/brightness", [](const String &payload, const size_t size)
+  {
+    int brightness = map(constrain(payload.toInt(), 1, 255), 1, 255, brightnessLUT[0], brightnessLUT[ENCODER_MAX_POS]);
+    whiteBrightness = brightness;
+    if (whiteLedState)
+      whiteLedChanged = true;
+    publishBrightnessState();
+  });
+
+  publishPowerState();
+  publishBrightnessState();
 }
 
 static void setupMQTT()
@@ -371,4 +399,23 @@ bool isMqttConnected()
 void publishHi()
 {
   mqtt.publish("publish/hi", deviceId);
+}
+
+void publishPowerState()
+{
+  if (!mqtt.isConnected())
+    return;
+  String stateTopic = "hilight/" + deviceId + "/power/state";
+  const char *payload = whiteLedState ? "ON" : "OFF";
+  mqtt.publish(stateTopic, (uint8_t *)payload, strlen(payload), true, 0);
+}
+
+void publishBrightnessState()
+{
+  if (!mqtt.isConnected())
+    return;
+  String stateTopic = "hilight/" + deviceId + "/brightness/state";
+  int haValue = map(whiteBrightness, brightnessLUT[0], brightnessLUT[ENCODER_MAX_POS], 1, 255);
+  String payload = String(haValue);
+  mqtt.publish(stateTopic, (uint8_t *)payload.c_str(), payload.length(), true, 0);
 }
