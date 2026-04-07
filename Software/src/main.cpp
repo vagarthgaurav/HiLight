@@ -79,12 +79,13 @@ void loop()
 
     if (targetSpinPos != animLedCount)
     {
+      CRGB bgColor = colorForId(deviceId);
+
       if (animLedCount == -1)
       {
         // First frame: set background and brightness
         whiteLedState = false;
         applyWhiteLight();
-        CRGB bgColor = colorForId(deviceId);
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = bgColor;
         FastLED.setBrightness(200);
@@ -93,8 +94,8 @@ void loop()
 
       if (targetSpinPos >= 0)
       {
-        CRGB bgColor = colorForId(deviceId);
         CRGB spColor = spinColorForId(deviceId);
+
         // Restore previous spinner position to background
         if (animLedCount >= 0)
           for (int s = 0; s < 4; s++)
@@ -144,16 +145,13 @@ void loop()
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = CRGB::Black;
         FastLED.show();
-        if (rgbLedState)
-        {
-          rgbLedState = false;
-        }
-        else
+        if (!rgbLedState)
         {
           whiteLedState = !whiteLedState;
           whiteLedChanged = true;
           publishPowerState();
         }
+        rgbLedState = false;
       }
 
       buttonPressed = false;

@@ -16,7 +16,7 @@ int lastClkState = HIGH;
 bool hiAnimActive = false;
 unsigned long hiAnimStart = 0;
 bool errorAnimActive = false;
-unsigned long errorAnimStart = 0;
+static unsigned long errorAnimStart = 0;
 bool apAnimActive = false;
 static unsigned long apAnimStart = 0;
 

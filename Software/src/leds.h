@@ -20,7 +20,6 @@ extern int lastClkState;
 extern bool hiAnimActive;
 extern unsigned long hiAnimStart;
 extern bool errorAnimActive;
-extern unsigned long errorAnimStart;
 extern bool apAnimActive;
 
 void applyWhiteLight();
