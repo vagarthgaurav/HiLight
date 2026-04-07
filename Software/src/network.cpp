@@ -116,6 +116,7 @@ static void loadCredentials()
 static void onMqttConnect()
 {
   Serial.println("MQTT connected!");
+  mqtt.publish("hilight/" + deviceId + "/availability", (uint8_t *)"online", 6, true, 0);
   mqtt.publish("client/connected", deviceId);
   mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
   {
@@ -189,6 +190,8 @@ static void setupMQTT()
   secureClient.setInsecure();
   webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
   mqtt.begin(webSocket);
+  mqtt.setKeepAliveTimeout(15); // broker declares client dead after ~22s; triggers LWT delivery
+  mqtt.setWill("hilight/" + deviceId + "/availability", "offline", true, 0);
 
   if (mqtt.connect(deviceId))
   {
