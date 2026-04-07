@@ -37,6 +37,7 @@ static unsigned long lastWifiAttempt = 0;
 
 static bool apModeActive = false;
 static bool shouldExitAP = false;
+static unsigned long apModeStart = 0;
 
 static bool mqttConnected = false;
 static unsigned long lastMqttAttempt = 0;
@@ -275,6 +276,7 @@ void startAPMode()
 
   webServer.begin();
   apModeActive = true;
+  apModeStart = millis();
   wifiConnecting = false;
 }
 
@@ -306,7 +308,7 @@ void updateNetwork()
   {
     dnsServer.processNextRequest();
     webServer.handleClient();
-    if (shouldExitAP)
+    if (shouldExitAP || millis() - apModeStart >= AP_MODE_TIMEOUT)
     {
       shouldExitAP = false;
       exitAPMode();
@@ -391,7 +393,8 @@ void updateNetwork()
       {
         lastMqttAttempt = millis();
         Serial.println("MQTT disconnected, reconnecting...");
-        webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
+        if (!webSocket.isConnected())
+          webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
         mqtt.connect(deviceId);
       }
     }
