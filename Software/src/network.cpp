@@ -139,9 +139,6 @@ static void onMqttConnect()
   mqtt.publish("client/connected", deviceId);
   mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
   {
-    if (payload == deviceId) // Ignore messages from self
-      return;
-
     ledMode = LED_RGB_ANIM;
     applyWhiteLight();
 

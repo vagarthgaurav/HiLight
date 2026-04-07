@@ -116,12 +116,6 @@ void loop()
         if (isMqttConnected())
         {
           publishHi();
-          ledMode = LED_RGB_ANIM;
-          CRGB bgColor = colorForId(deviceId);
-          for (int i = 0; i < NUM_LEDS; i++)
-            leds[i] = bgColor;
-          FastLED.setBrightness(SPINNER_BRIGHTNESS);
-          FastLED.show();
         }
         else
         {
