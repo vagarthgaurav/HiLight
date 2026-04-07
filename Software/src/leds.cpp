@@ -40,8 +40,7 @@ void applyWhiteLight()
     // White LED off
     analogWrite(WHITE_LED_PIN, 0);
   }
-  Serial.print("LED mode: ");
-  Serial.println(ledMode);
+
 }
 
 void startErrorAnim()

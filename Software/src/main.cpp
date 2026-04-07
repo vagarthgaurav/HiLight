@@ -13,8 +13,6 @@ static bool apModeTriggered = false;
 
 void setup()
 {
-  Serial.begin(115200);
-
   FastLED.addLeds<NEOPIXEL, RGB_DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
 
   initNetwork();
@@ -71,7 +69,6 @@ void loop()
 
     if (!apModeTriggered && elapsed >= AP_PRESS_TIME)
     {
-      Serial.println("5s hold — entering AP mode");
       startAPMode();
       startAPAnim();
       apModeTriggered = true;
@@ -116,11 +113,8 @@ void loop()
 
       if (pressDuration >= LONG_PRESS_TIME)
       {
-        Serial.println("Long press");
-
         if (isMqttConnected())
         {
-          Serial.println("Saying Hi!");
           publishHi();
           ledMode = LED_RGB_ANIM;
           CRGB bgColor = colorForId(deviceId);
@@ -131,13 +125,11 @@ void loop()
         }
         else
         {
-          Serial.println("No connection — showing error animation");
           startErrorAnim();
         }
       }
       else
       {
-        Serial.println("Short press");
         // Clear animation LEDs
         hiAnimActive = false;
         FastLED.setBrightness(255);

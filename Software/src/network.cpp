@@ -134,7 +134,6 @@ static void publishDiscovery()
 
 static void onMqttConnect()
 {
-  Serial.println("MQTT connected!");
   mqtt.publish("hilight/" + deviceId + "/availability", (uint8_t *)"online", 6, true, 0);
   publishDiscovery();
   mqtt.publish("client/connected", deviceId);
@@ -142,9 +141,6 @@ static void onMqttConnect()
   {
     if (payload == deviceId) // Ignore messages from self
       return;
-
-    Serial.print("publish/hi: ");
-    Serial.println(payload);
 
     ledMode = LED_RGB_ANIM;
     applyWhiteLight();
@@ -223,8 +219,6 @@ void initNetwork()
   loadCredentials();
   WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
   deviceId = "HiLight_" + WiFi.macAddress();
-  Serial.print("Device ID: ");
-  Serial.println(deviceId);
   wifiConnecting = true;
   wifiConnectStart = millis();
 }
@@ -234,7 +228,6 @@ void startAPMode()
   WiFi.disconnect();
   WiFi.mode(WIFI_AP_STA);
 
-  Serial.println("Scanning for WiFi networks...");
   int n = WiFi.scanNetworks();
   String scanOptions = "";
   for (int i = 0; i < n; i++)
@@ -244,16 +237,9 @@ void startAPMode()
     scanOptions += "<option value=\"" + ssid + "\">" + ssid + "</option>\n";
   }
   WiFi.scanDelete();
-  Serial.print("Found ");
-  Serial.print(n);
-  Serial.println(" networks.");
 
   String apSSID = "HiLight-Setup";
   WiFi.softAP(apSSID.c_str());
-  Serial.print("AP Mode started. SSID: ");
-  Serial.println(apSSID);
-  Serial.print("AP IP: ");
-  Serial.println(WiFi.softAPIP());
 
   dnsServer.start(53, "*", WiFi.softAPIP());
 
@@ -286,7 +272,6 @@ void startAPMode()
     prefs.putString("ssid", ssid);
     prefs.putString("pass", password);
     prefs.end();
-    Serial.println("WiFi credentials saved.");
     webServer.send(200, "text/html", AP_SAVED_PAGE);
     shouldExitAP = true;
   });
@@ -339,7 +324,6 @@ void updateNetwork()
     {
       wifiConnecting = false;
       lastWifiAttempt = millis();
-      Serial.println("WiFi connected.");
       setupMQTT();
       firstWifiAttempt = false;
     }
@@ -347,7 +331,6 @@ void updateNetwork()
     {
       wifiConnecting = false;
       lastWifiAttempt = millis();
-      Serial.println("WiFi connection timed out, will retry in 5 minutes.");
       if (firstWifiAttempt)
       {
         firstWifiAttempt = false;
@@ -364,9 +347,6 @@ void updateNetwork()
     {
       String url = pendingOtaUrl;
       pendingOtaUrl = "";
-
-      Serial.print("OTA update requested from: ");
-      Serial.println(url);
 
       // Clear the retained message on the broker before starting the download
       // so the device does not re-trigger OTA with the stale URL after reboot
@@ -387,11 +367,7 @@ void updateNetwork()
       t_httpUpdate_return result = httpUpdate.update(otaClient, url);
 
       if (result == HTTP_UPDATE_FAILED)
-      {
-        Serial.print("OTA failed: ");
-        Serial.println(httpUpdate.getLastErrorString());
         startErrorAnim();
-      }
       // HTTP_UPDATE_NO_UPDATES: silently ignore (not an error)
       // HTTP_UPDATE_OK: device was rebooted by httpUpdate, never reached
       return;
@@ -409,7 +385,6 @@ void updateNetwork()
       if (millis() - lastMqttAttempt >= MQTT_RETRY_INTERVAL)
       {
         lastMqttAttempt = millis();
-        Serial.println("MQTT disconnected, reconnecting...");
         if (!webSocket.isConnected())
           webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
         mqtt.connect(deviceId);
@@ -418,7 +393,6 @@ void updateNetwork()
   }
   else if (millis() - lastWifiAttempt >= WIFI_RETRY_INTERVAL)
   {
-    Serial.println("Retrying WiFi connection...");
     WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
     wifiConnecting = true;
     wifiConnectStart = millis();
