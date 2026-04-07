@@ -114,10 +114,29 @@ static void loadCredentials()
   prefs.end();
 }
 
+static void publishDiscovery()
+{
+  String disco = "{";
+  disco += "\"name\":\"" + deviceId + "\",";
+  disco += "\"unique_id\":\"" + deviceId + "\",";
+  disco += "\"state_topic\":\"hilight/" + deviceId + "/power/state\",";
+  disco += "\"command_topic\":\"hilight/" + deviceId + "/power\",";
+  disco += "\"brightness_state_topic\":\"hilight/" + deviceId + "/brightness/state\",";
+  disco += "\"brightness_command_topic\":\"hilight/" + deviceId + "/brightness\",";
+  disco += "\"availability_topic\":\"hilight/" + deviceId + "/availability\",";
+  disco += "\"payload_on\":\"ON\",";
+  disco += "\"payload_off\":\"OFF\",";
+  disco += "\"brightness_scale\":255";
+  disco += "}";
+  mqtt.publish("homeassistant/light/" + deviceId + "/config",
+               (uint8_t *)disco.c_str(), disco.length(), true, 0);
+}
+
 static void onMqttConnect()
 {
   Serial.println("MQTT connected!");
   mqtt.publish("hilight/" + deviceId + "/availability", (uint8_t *)"online", 6, true, 0);
+  publishDiscovery();
   mqtt.publish("client/connected", deviceId);
   mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
   {
