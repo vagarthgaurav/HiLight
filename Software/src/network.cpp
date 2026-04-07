@@ -162,8 +162,19 @@ static void onMqttConnect()
 
   mqtt.subscribe("hilight/" + deviceId + "/brightness", [](const String &payload, const size_t size)
   {
-    int brightness = map(constrain(payload.toInt(), 1, 255), 1, 255, brightnessLUT[0], brightnessLUT[ENCODER_MAX_POS]);
+    int brightness = map(constrain(payload.toInt(), 1, 255), 1, 255, brightnessLUT[0],
+                         brightnessLUT[ENCODER_MAX_POS]);
     whiteBrightness = brightness;
+
+    // Find the nearest brightness level in the LUT and update encoderPos accordingly
+    int nearest = 0;
+    for (int i = 1; i <= ENCODER_MAX_POS; i++)
+    {
+      if (abs(brightnessLUT[i] - brightness) < abs(brightnessLUT[nearest] - brightness))
+        nearest = i;
+    }
+    encoderPos = nearest;
+
     if (whiteLedState)
       whiteLedChanged = true;
     publishBrightnessState();
