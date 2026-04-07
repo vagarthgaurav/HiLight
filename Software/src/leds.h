@@ -5,10 +5,10 @@
 
 extern CRGB leds[NUM_LEDS];
 
-// White LED state
-extern bool whiteLedState;
+// LED mode
+enum LedMode { LED_IDLE, LED_WHITE, LED_RGB_ANIM };
+extern LedMode ledMode;
 extern bool whiteLedChanged;
-extern bool rgbLedState;
 
 // Encoder / brightness
 extern const uint8_t brightnessLUT[];

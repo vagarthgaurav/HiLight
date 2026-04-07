@@ -30,3 +30,7 @@
 
 // Encoder
 #define ENCODER_MAX_POS 16
+
+// LED rendering
+#define SPINNER_BRIGHTNESS 200
+#define SPINNER_WIDTH 4

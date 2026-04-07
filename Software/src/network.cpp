@@ -146,7 +146,7 @@ static void onMqttConnect()
     Serial.print("publish/hi: ");
     Serial.println(payload);
 
-    whiteLedState = false;
+    ledMode = LED_RGB_ANIM;
     applyWhiteLight();
 
     CRGB color = colorForId(payload);
@@ -156,7 +156,6 @@ static void onMqttConnect()
     FastLED.show();
     hiAnimActive = true;
     hiAnimStart = millis();
-    rgbLedState = true;
   });
 
   mqtt.subscribe("hilight/ota", [](const String &url, const size_t size)
@@ -171,12 +170,11 @@ static void onMqttConnect()
       return;
 
     hiAnimActive = false;
-    rgbLedState = false;
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = CRGB::Black;
     FastLED.show();
 
-    whiteLedState = (payload == "ON");
+    ledMode = (payload == "ON") ? LED_WHITE : LED_IDLE;
     whiteLedChanged = true;
     publishPowerState();
   });
@@ -196,7 +194,7 @@ static void onMqttConnect()
     }
     encoderPos = nearest;
 
-    if (whiteLedState)
+    if (ledMode == LED_WHITE)
       whiteLedChanged = true;
     publishBrightnessState();
   });
@@ -442,7 +440,7 @@ void publishPowerState()
   if (!mqtt.isConnected())
     return;
   String stateTopic = "hilight/" + deviceId + "/power/state";
-  const char *payload = whiteLedState ? "ON" : "OFF";
+  const char *payload = (ledMode == LED_WHITE) ? "ON" : "OFF";
   mqtt.publish(stateTopic, (uint8_t *)payload, strlen(payload), true, 0);
 }
 

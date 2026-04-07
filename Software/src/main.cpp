@@ -45,7 +45,7 @@ void loop()
     {
       encoderPos = newPos;
       whiteBrightness = brightnessLUT[encoderPos];
-      if (whiteLedState)
+      if (ledMode == LED_WHITE)
         analogWrite(WHITE_LED_PIN, whiteBrightness);
       publishBrightnessState();
     }
@@ -65,9 +65,9 @@ void loop()
     unsigned long elapsed = millis() - pressStart;
     int targetSpinPos = elapsed < ANIM_START_DELAY
                             ? -1
-                            : min((int)(((elapsed - ANIM_START_DELAY) * (NUM_LEDS - 4)) /
+                            : min((int)(((elapsed - ANIM_START_DELAY) * (NUM_LEDS - SPINNER_WIDTH)) /
                                         (LONG_PRESS_TIME - ANIM_START_DELAY)),
-                                  NUM_LEDS - 4);
+                                  NUM_LEDS - SPINNER_WIDTH);
 
     if (!apModeTriggered && elapsed >= AP_PRESS_TIME)
     {
@@ -84,12 +84,11 @@ void loop()
       if (animLedCount == -1)
       {
         // First frame: set background and brightness
-        whiteLedState = false;
+        ledMode = LED_RGB_ANIM;
         applyWhiteLight();
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = bgColor;
-        FastLED.setBrightness(200);
-        rgbLedState = true;
+        FastLED.setBrightness(SPINNER_BRIGHTNESS);
       }
 
       if (targetSpinPos >= 0)
@@ -98,10 +97,10 @@ void loop()
 
         // Restore previous spinner position to background
         if (animLedCount >= 0)
-          for (int s = 0; s < 4; s++)
+          for (int s = 0; s < SPINNER_WIDTH; s++)
             leds[animLedCount + s] = bgColor;
         // Draw spinner at new position
-        for (int s = 0; s < 4; s++)
+        for (int s = 0; s < SPINNER_WIDTH; s++)
           leds[targetSpinPos + s] = spColor;
         FastLED.show();
       }
@@ -123,11 +122,11 @@ void loop()
         {
           Serial.println("Saying Hi!");
           publishHi();
-          whiteLedState = false;
+          ledMode = LED_RGB_ANIM;
           CRGB bgColor = colorForId(deviceId);
           for (int i = 0; i < NUM_LEDS; i++)
             leds[i] = bgColor;
-          FastLED.setBrightness(200);
+          FastLED.setBrightness(SPINNER_BRIGHTNESS);
           FastLED.show();
         }
         else
@@ -145,13 +144,16 @@ void loop()
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = CRGB::Black;
         FastLED.show();
-        if (!rgbLedState)
+        if (ledMode == LED_RGB_ANIM)
         {
-          whiteLedState = !whiteLedState;
+          ledMode = LED_IDLE;
+        }
+        else
+        {
+          ledMode = (ledMode == LED_WHITE) ? LED_IDLE : LED_WHITE;
           whiteLedChanged = true;
           publishPowerState();
         }
-        rgbLedState = false;
       }
 
       buttonPressed = false;

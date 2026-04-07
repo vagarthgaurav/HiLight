@@ -2,9 +2,8 @@
 
 CRGB leds[NUM_LEDS];
 
-bool whiteLedState = false;
+LedMode ledMode = LED_IDLE;
 bool whiteLedChanged = false;
-bool rgbLedState = false;
 
 // Logarithmically spaced brightness values (80..250 in 17 steps)
 const uint8_t brightnessLUT[] = {80,  86,  93,  100, 107, 115, 124, 133, 143,
@@ -28,7 +27,7 @@ static const CRGB OTA_SPIN_COLOR = CRGB(160, 90, 0); // darker amber-yellow
 
 void applyWhiteLight()
 {
-  if (whiteLedState)
+  if (ledMode == LED_WHITE)
   {
     // White LED on: turn off RGB strip
     for (int i = 0; i < NUM_LEDS; i++)
@@ -41,13 +40,13 @@ void applyWhiteLight()
     // White LED off
     analogWrite(WHITE_LED_PIN, 0);
   }
-  Serial.print("White LED state: ");
-  Serial.println(whiteLedState);
+  Serial.print("LED mode: ");
+  Serial.println(ledMode);
 }
 
 void startErrorAnim()
 {
-  whiteLedState = false;
+  ledMode = LED_RGB_ANIM;
   applyWhiteLight();
   for (int i = 0; i < NUM_LEDS; i++)
     leds[i] = CRGB::Red;
@@ -56,7 +55,6 @@ void startErrorAnim()
   hiAnimActive = false;
   errorAnimActive = true;
   errorAnimStart = millis();
-  rgbLedState = true;
 }
 
 void updateErrorAnim()
@@ -73,7 +71,7 @@ void updateErrorAnim()
     FastLED.show();
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = CRGB::Black;
-    rgbLedState = false;
+    ledMode = LED_IDLE;
     errorAnimActive = false;
   }
   else
@@ -94,7 +92,7 @@ void updateErrorAnim()
 
 void startAPAnim()
 {
-  whiteLedState = false;
+  ledMode = LED_RGB_ANIM;
   applyWhiteLight();
   for (int i = 0; i < NUM_LEDS; i++)
     leds[i] = CRGB::Orange;
@@ -104,7 +102,6 @@ void startAPAnim()
   errorAnimActive = false;
   apAnimActive = true;
   apAnimStart = millis();
-  rgbLedState = true;
 }
 
 void stopAPAnim()
@@ -114,7 +111,7 @@ void stopAPAnim()
   for (int i = 0; i < NUM_LEDS; i++)
     leds[i] = CRGB::Black;
   FastLED.show();
-  rgbLedState = false;
+  ledMode = LED_IDLE;
 }
 
 void updateAPAnim()
@@ -135,7 +132,7 @@ void updateAPAnim()
 
 void startOTAAnim()
 {
-  whiteLedState = false;
+  ledMode = LED_RGB_ANIM;
   applyWhiteLight();
   hiAnimActive = false;
   errorAnimActive = false;
@@ -145,12 +142,11 @@ void startOTAAnim()
 
   for (int i = 0; i < NUM_LEDS; i++)
     leds[i] = OTA_BG_COLOR;
-  // Place 4 consecutive spinner LEDs
-  for (int s = 0; s < 4; s++)
+  // Place SPINNER_WIDTH consecutive spinner LEDs
+  for (int s = 0; s < SPINNER_WIDTH; s++)
     leds[(otaSpinPos + s) % NUM_LEDS] = OTA_SPIN_COLOR;
-  FastLED.setBrightness(200);
+  FastLED.setBrightness(SPINNER_BRIGHTNESS);
   FastLED.show();
-  rgbLedState = true;
 }
 
 void advanceOTASpinner()
@@ -163,7 +159,7 @@ void advanceOTASpinner()
   otaSpinPos = (otaSpinPos + 1) % NUM_LEDS;
   for (int i = 0; i < NUM_LEDS; i++)
     leds[i] = OTA_BG_COLOR;
-  for (int s = 0; s < 4; s++)
+  for (int s = 0; s < SPINNER_WIDTH; s++)
     leds[(otaSpinPos + s) % NUM_LEDS] = OTA_SPIN_COLOR;
   FastLED.show();
 }
