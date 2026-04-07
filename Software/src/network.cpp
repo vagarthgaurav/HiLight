@@ -249,7 +249,7 @@ void startAPMode()
   // Captive portal detection — redirect OS connectivity checks to the setup page
   auto captiveRedirect = []()
   {
-    webServer.sendHeader("Location", "http://hi-light-setup", true);
+    webServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
     webServer.send(302, "text/plain", "");
   };
   webServer.on("/generate_204", HTTP_GET, captiveRedirect);        // Android
