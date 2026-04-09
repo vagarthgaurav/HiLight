@@ -17,7 +17,8 @@ void setup()
 
   initNetwork();
 
-  pinMode(WHITE_LED_PIN, OUTPUT);
+  ledcSetup(WHITE_LED_CHANNEL, WHITE_LED_FREQ, 8);
+  ledcAttachPin(WHITE_LED_PIN, WHITE_LED_CHANNEL);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(CLK_PIN, INPUT_PULLUP);
   pinMode(DT_PIN, INPUT_PULLUP);
@@ -44,7 +45,7 @@ void loop()
       encoderPos = newPos;
       whiteBrightness = brightnessLUT[encoderPos];
       if (ledMode == LED_WHITE)
-        analogWrite(WHITE_LED_PIN, whiteBrightness);
+        ledcWrite(WHITE_LED_CHANNEL, whiteBrightness);
       publishBrightnessState();
     }
   }

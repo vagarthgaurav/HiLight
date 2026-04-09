@@ -5,9 +5,11 @@ CRGB leds[NUM_LEDS];
 LedMode ledMode = LED_IDLE;
 bool whiteLedChanged = false;
 
-// Logarithmically spaced brightness values (80..250 in 17 steps)
-const uint8_t brightnessLUT[] = {80,  86,  93,  100, 107, 115, 124, 133, 143,
-                                 154, 165, 178, 191, 205, 221, 237, 250};
+// Gamma-corrected brightness values (gamma=2.2, PWM 5..255 in 17 steps).
+// Equal encoder steps produce perceptually equal brightness changes.
+// Flicker-free at all levels because LEDC runs at 20 kHz (see WHITE_LED_FREQ).
+const uint8_t brightnessLUT[] = {  5,   9,  15,  21,  30,  39,  51,  64,  78,
+                                   94, 112, 132, 153, 176, 200, 227, 255};
 int encoderPos = 0;
 int whiteBrightness = brightnessLUT[0];
 int lastClkState = HIGH;
@@ -33,12 +35,12 @@ void applyWhiteLight()
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = CRGB::Black;
     FastLED.show();
-    analogWrite(WHITE_LED_PIN, whiteBrightness);
+    ledcWrite(WHITE_LED_CHANNEL, whiteBrightness);
   }
   else
   {
     // White LED off
-    analogWrite(WHITE_LED_PIN, 0);
+    ledcWrite(WHITE_LED_CHANNEL, 0);
   }
 
 }
