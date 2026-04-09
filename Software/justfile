@@ -14,7 +14,7 @@ upload-monitor:
 
 deploy:
     {{pio}} run
-    scp .pio/build/esp32-c3-devkitc-02/firmware.bin vagarth@meisen-server:/home/vagarth/hi-light-firmware/firmware.bin
+    scp .pio/build/esp32-c3-devkitc-02/firmware.bin vagarth@vagarth-server:/home/vagarth/hi-light-firmware/firmware.bin
 
 ota:
     mqttx pub -h mqtt.vagarth.dev -p 443 -l wss --path /mqtt -t "hilight/ota" -m "https://hi-light-fw.vagarth.dev/firmware.bin?t=$(date +%s)"
