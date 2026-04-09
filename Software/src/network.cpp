@@ -2,7 +2,9 @@
 #include "config.h"
 #include "device.h"
 #include "leds.h"
+#if __has_include("secrets.h")
 #include "secrets.h"
+#endif
 
 // clang-format off
 // WebSocketsClient.h must be included before MQTTPubSubClient.h
