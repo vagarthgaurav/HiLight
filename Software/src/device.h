@@ -4,7 +4,8 @@
 
 struct MacColor
 {
-  const char *id; // "HiLight_XX:XX:XX:XX:XX:XX"
+  const char *id; // "HiLight_XXXXXXXXXXXX"
+  const char *name;
   CRGB color;
   CRGB spinColor;
 };
@@ -15,3 +16,4 @@ extern String deviceId;
 
 CRGB colorForId(const String &id);
 CRGB spinColorForId(const String &id);
+const char *nameForId(const String &id);

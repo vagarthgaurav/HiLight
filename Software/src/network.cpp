@@ -116,9 +116,15 @@ static void loadCredentials()
 
 static void publishDiscovery()
 {
+  String ownerName = nameForId(deviceId);
   String disco = "{";
-  disco += "\"name\":\"" + deviceId + "\",";
+  disco += "\"name\":\"HiLight (" + ownerName + ")\",";
   disco += "\"unique_id\":\"" + deviceId + "\",";
+  disco += "\"device\":{";
+  disco += "\"identifiers\":[\"" + deviceId + "\"],";
+  disco += "\"name\":\"HiLight (" + ownerName + ")\",";
+  disco += "\"model\":\"HiLight Lamp\"";
+  disco += "},";
   disco += "\"state_topic\":\"hilight/" + deviceId + "/power/state\",";
   disco += "\"command_topic\":\"hilight/" + deviceId + "/power\",";
   disco += "\"brightness_state_topic\":\"hilight/" + deviceId + "/brightness/state\",";
@@ -215,7 +221,9 @@ void initNetwork()
 {
   loadCredentials();
   WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
-  deviceId = "HiLight_" + WiFi.macAddress();
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  deviceId = "HiLight_" + mac;
   wifiConnecting = true;
   wifiConnectStart = millis();
 }

@@ -3,10 +3,10 @@
 String deviceId;
 
 const MacColor macColorTable[] = {
-    {"HiLight_7C:2C:67:0B:83:48", CRGB::OrangeRed, CRGB::DarkRed},     // Alexandra & Gabriel
-    {"HiLight_7C:2C:67:0B:9F:F0", CRGB::ForestGreen, CRGB::DarkGreen}, // Jutta & Patrick
-    {"HiLight_7C:2C:67:0B:92:08", CRGB::Turquoise, CRGB::DarkBlue},    // Sabrina & Vagarth
-    {"HiLight_7C:2C:67:0B:93:90", CRGB::DeepPink, CRGB::DarkRed},      // Edith & Robert
+    {"HiLight_7C2C670B8348", "Alexandra & Gabriel", CRGB::OrangeRed, CRGB::DarkRed},
+    {"HiLight_7C2C670B9FF0", "Jutta & Patrick", CRGB::ForestGreen, CRGB::DarkGreen},
+    {"HiLight_7C2C670B9208", "Sabrina & Vagarth", CRGB::Turquoise, CRGB::DarkBlue},
+    {"HiLight_7C2C670B9390", "Vagarth Test", CRGB::DeepPink, CRGB::DarkRed},
 };
 const int macColorTableSize = sizeof(macColorTable) / sizeof(macColorTable[0]);
 
@@ -28,4 +28,14 @@ CRGB spinColorForId(const String &id)
       return macColorTable[i].spinColor;
   }
   return CRGB::Blue; // default
+}
+
+const char *nameForId(const String &id)
+{
+  for (int i = 0; i < macColorTableSize; i++)
+  {
+    if (id == macColorTable[i].id)
+      return macColorTable[i].name;
+  }
+  return "HiLight"; // default
 }
