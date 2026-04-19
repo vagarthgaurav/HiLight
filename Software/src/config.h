@@ -1,5 +1,18 @@
 #pragma once
 
+// Set to 1 to enable debug serial output
+#define DEBUG 0
+
+#if DEBUG
+#define DBG_PRINT(...) Serial.print(__VA_ARGS__)
+#define DBG_PRINTLN(...) Serial.println(__VA_ARGS__)
+#define DBG_PRINTF(...) Serial.printf(__VA_ARGS__)
+#else
+#define DBG_PRINT(...)
+#define DBG_PRINTLN(...)
+#define DBG_PRINTF(...)
+#endif
+
 // Pin definitions
 #define BUTTON_PIN 8
 #define WHITE_LED_PIN 4

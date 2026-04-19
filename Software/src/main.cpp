@@ -13,6 +13,12 @@ static bool apModeTriggered = false;
 
 void setup()
 {
+#if DEBUG
+  Serial.begin(115200);
+  while (!Serial && millis() < 3000)
+    delay(10);
+#endif
+
   FastLED.addLeds<NEOPIXEL, RGB_DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
 
   initNetwork();

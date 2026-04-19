@@ -2,10 +2,6 @@
 #include "config.h"
 #include "device.h"
 #include "leds.h"
-#if __has_include("secrets.h")
-#include "secrets.h"
-#endif
-
 // clang-format off
 // WebSocketsClient.h must be included before MQTTPubSubClient.h
 #include <WebSocketsClient.h>
@@ -111,8 +107,8 @@ static const char *AP_SAVED_PAGE = R"(<!DOCTYPE html>
 static void loadCredentials()
 {
   prefs.begin("wifi", true);
-  wifiSSID = prefs.getString("ssid", WIFI_SSID);
-  wifiPassword = prefs.getString("pass", WIFI_PASSWORD);
+  wifiSSID = prefs.getString("ssid", "");
+  wifiPassword = prefs.getString("pass", "");
   prefs.end();
 }
 
@@ -206,6 +202,7 @@ static void onMqttConnect()
 
 static void setupMQTT()
 {
+  DBG_PRINTF("[MQTT] Connecting to %s:%d%s\n", broker_host, broker_port, ws_path);
   secureClient.setInsecure();
   webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
   mqtt.begin(webSocket);
@@ -214,18 +211,25 @@ static void setupMQTT()
 
   if (mqtt.connect(deviceId))
   {
+    DBG_PRINTLN("[MQTT] Connected");
     mqttConnected = true;
     onMqttConnect();
+  }
+  else
+  {
+    DBG_PRINTLN("[MQTT] Initial connect failed");
   }
 }
 
 void initNetwork()
 {
   loadCredentials();
+  DBG_PRINTF("[WiFi] Connecting to SSID: %s\n", wifiSSID.c_str());
   WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
   String mac = WiFi.macAddress();
   mac.replace(":", "");
   deviceId = "HiLight_" + mac;
+  DBG_PRINTF("[Device] ID: %s\n", deviceId.c_str());
   wifiConnecting = true;
   wifiConnectStart = millis();
 }
@@ -329,6 +333,7 @@ void updateNetwork()
   {
     if (WiFi.status() == WL_CONNECTED)
     {
+      DBG_PRINTF("[WiFi] Connected. IP: %s\n", WiFi.localIP().toString().c_str());
       wifiConnecting = false;
       lastWifiAttempt = millis();
       setupMQTT();
@@ -336,6 +341,7 @@ void updateNetwork()
     }
     else if (millis() - wifiConnectStart >= WIFI_CONNECT_TIMEOUT)
     {
+      DBG_PRINTF("[WiFi] Connection timed out (status=%d)\n", WiFi.status());
       wifiConnecting = false;
       lastWifiAttempt = millis();
       if (firstWifiAttempt)
@@ -383,6 +389,7 @@ void updateNetwork()
     bool nowConnected = mqtt.isConnected();
     if (nowConnected && !mqttConnected)
     {
+      DBG_PRINTLN("[MQTT] Reconnected");
       mqttConnected = true;
       onMqttConnect();
     }
@@ -392,6 +399,7 @@ void updateNetwork()
       if (millis() - lastMqttAttempt >= MQTT_RETRY_INTERVAL)
       {
         lastMqttAttempt = millis();
+        DBG_PRINTF("[MQTT] Retrying... ws=%d\n", webSocket.isConnected());
         if (!webSocket.isConnected())
           webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
         mqtt.connect(deviceId);
@@ -400,6 +408,7 @@ void updateNetwork()
   }
   else if (millis() - lastWifiAttempt >= WIFI_RETRY_INTERVAL)
   {
+    DBG_PRINTF("[WiFi] Retrying SSID: %s\n", wifiSSID.c_str());
     WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
     wifiConnecting = true;
     wifiConnectStart = millis();
