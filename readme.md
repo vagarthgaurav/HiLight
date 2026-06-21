@@ -26,8 +26,6 @@ The project consists of two custom PCBs:
 
 <img src="images/Hi light.jpeg" width="400" alt="HiLight lamp photo">
 
-KiCad project files are in [Hardware/](Hardware/).
-
 ## Software
 
 Firmware is built with PlatformIO (Arduino framework) targeting the ESP32-C3.
