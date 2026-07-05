@@ -32,6 +32,7 @@
 #define WIFI_CONNECT_TIMEOUT 5000UL
 #define WIFI_RETRY_INTERVAL (5UL * 60UL * 1000UL)
 #define MQTT_RETRY_INTERVAL 5000UL
+#define MQTT_MAX_RETRIES 5 // give up reconnecting after this many failed attempts (until next WiFi reconnect)
 #define AP_MODE_TIMEOUT (5UL * 60UL * 1000UL) // auto-exit AP mode after 5 minutes
 
 // Animation timing (ms)

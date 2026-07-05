@@ -39,6 +39,8 @@ static unsigned long apModeStart = 0;
 
 static bool mqttConnected = false;
 static unsigned long lastMqttAttempt = 0;
+static int mqttRetryCount = 0;
+static bool mqttRetriesExhausted = false;
 
 static String pendingOtaUrl = "";
 
@@ -202,6 +204,8 @@ static void onMqttConnect()
 
 static void setupMQTT()
 {
+  mqttRetryCount = 0;
+  mqttRetriesExhausted = false;
   DBG_PRINTF("[MQTT] Connecting to %s:%d%s\n", broker_host, broker_port, ws_path);
   secureClient.setInsecure();
   webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
@@ -353,8 +357,14 @@ void updateNetwork()
   }
   else if (WiFi.status() == WL_CONNECTED)
   {
-    webSocket.loop();
-    mqtt.update();
+    bool dueForRetry = !mqttConnected && !mqttRetriesExhausted &&
+                       (millis() - lastMqttAttempt >= MQTT_RETRY_INTERVAL);
+
+    if (mqttConnected || dueForRetry)
+    {
+      webSocket.loop();
+      mqtt.update();
+    }
 
     if (pendingOtaUrl.length() > 0)
     {
@@ -396,13 +406,20 @@ void updateNetwork()
     else if (!nowConnected)
     {
       mqttConnected = false;
-      if (millis() - lastMqttAttempt >= MQTT_RETRY_INTERVAL)
+      if (dueForRetry)
       {
         lastMqttAttempt = millis();
-        DBG_PRINTF("[MQTT] Retrying... ws=%d\n", webSocket.isConnected());
-        if (!webSocket.isConnected())
-          webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
-        mqtt.connect(deviceId);
+        mqttRetryCount++;
+        DBG_PRINTF("[MQTT] Retry %d/%d, ws=%d\n", mqttRetryCount, MQTT_MAX_RETRIES, webSocket.isConnected());
+
+        if (webSocket.isConnected())
+          mqtt.connect(deviceId);
+
+        if (mqttRetryCount >= MQTT_MAX_RETRIES)
+        {
+          DBG_PRINTLN("[MQTT] Retry limit reached, giving up until next WiFi reconnect");
+          mqttRetriesExhausted = true;
+        }
       }
     }
   }
