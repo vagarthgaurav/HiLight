@@ -27,6 +27,7 @@
 #define LONG_PRESS_TIME 2000UL
 #define AP_PRESS_TIME 5000UL
 #define ANIM_START_DELAY 300UL
+#define DOUBLE_CLICK_WINDOW 350UL // max gap between two short clicks to count as a double-click
 
 // Network timing
 #define WIFI_CONNECT_TIMEOUT 5000UL

@@ -1,18 +1,22 @@
 #include "leds.h"
+#include <math.h>
 
 CRGB leds[NUM_LEDS];
 
 LedMode ledMode = LED_IDLE;
 bool whiteLedChanged = false;
+bool cctChanged = false;
 
 // Gamma-corrected brightness values (gamma=2.2, PWM 5..255 in 17 steps).
 // Equal encoder steps produce perceptually equal brightness changes.
 // Flicker-free at all levels because LEDC runs at 20 kHz (see WHITE_LED_FREQ).
 const uint8_t brightnessLUT[] = {  5,   9,  15,  21,  30,  39,  51,  64,  78,
                                    94, 112, 132, 153, 176, 200, 227, 255};
-int encoderPos = 0;
+int brightnessPos = 0;
+int cctPos = 0;
 int whiteBrightness = brightnessLUT[0];
 int lastClkState = HIGH;
+EncoderTarget encoderTarget = ENC_BRIGHTNESS;
 
 bool hiAnimActive = false;
 unsigned long hiAnimStart = 0;
@@ -43,6 +47,48 @@ void applyWhiteLight()
     ledcWrite(WHITE_LED_CHANNEL, 0);
   }
 
+}
+
+void applyCCTLight()
+{
+  if (ledMode == LED_CCT)
+  {
+    // Equal-power crossfade (cos/sin) so neither end looks dimmer than the other.
+    uint8_t envelope = brightnessLUT[constrain(brightnessPos, 0, ENCODER_MAX_POS)];
+    int warmVal, coldVal;
+
+    if (cctPos <= 0)
+    {
+      warmVal = envelope;
+      coldVal = 0;
+    }
+    else if (cctPos >= ENCODER_MAX_POS)
+    {
+      warmVal = 0;
+      coldVal = envelope;
+    }
+    else
+    {
+      float theta = (cctPos / (float)ENCODER_MAX_POS) * (PI / 2.0f);
+      warmVal = (int)roundf(cosf(theta) * envelope);
+      coldVal = (int)roundf(sinf(theta) * envelope);
+    }
+
+    ledcWrite(WHITE_LED_CHANNEL, constrain(warmVal, 0, 255));
+
+    for (int i = 0; i < NUM_LEDS; i++)
+      leds[i] = CRGB::White;
+    FastLED.setBrightness(constrain(coldVal, 0, 255));
+    FastLED.show();
+  }
+  else
+  {
+    ledcWrite(WHITE_LED_CHANNEL, 0);
+    for (int i = 0; i < NUM_LEDS; i++)
+      leds[i] = CRGB::Black;
+    FastLED.setBrightness(255);
+    FastLED.show();
+  }
 }
 
 void startErrorAnim()

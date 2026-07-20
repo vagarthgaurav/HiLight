@@ -184,14 +184,14 @@ static void onMqttConnect()
                          brightnessLUT[ENCODER_MAX_POS]);
     whiteBrightness = brightness;
 
-    // Find the nearest brightness level in the LUT and update encoderPos accordingly
+    // Find the nearest brightness level in the LUT and update brightnessPos accordingly
     int nearest = 0;
     for (int i = 1; i <= ENCODER_MAX_POS; i++)
     {
       if (abs(brightnessLUT[i] - brightness) < abs(brightnessLUT[nearest] - brightness))
         nearest = i;
     }
-    encoderPos = nearest;
+    brightnessPos = nearest;
 
     if (ledMode == LED_WHITE)
       whiteLedChanged = true;
@@ -447,7 +447,7 @@ void publishPowerState()
   if (!mqtt.isConnected())
     return;
   String stateTopic = "hilight/" + deviceId + "/power/state";
-  const char *payload = (ledMode == LED_WHITE) ? "ON" : "OFF";
+  const char *payload = (ledMode == LED_WHITE || ledMode == LED_CCT) ? "ON" : "OFF";
   mqtt.publish(stateTopic, (uint8_t *)payload, strlen(payload), true, 0);
 }
 

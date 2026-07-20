@@ -10,6 +10,8 @@ static bool buttonPressed = false;
 static unsigned long pressStart = 0;
 static int animLedCount = 0;
 static bool apModeTriggered = false;
+static bool awaitingClick = false;
+static unsigned long firstClickTime = 0;
 
 void setup()
 {
@@ -41,18 +43,30 @@ void loop()
     return;
   }
 
-  // Rotary encoder: adjust white LED brightness (logarithmic)
   int clkState = digitalRead(CLK_PIN);
-  if (lastClkState == HIGH && clkState == LOW)
+  if (ledMode == LED_CCT && lastClkState == HIGH && clkState == LOW)
   {
-    int newPos = constrain(encoderPos + (digitalRead(DT_PIN) == HIGH ? -1 : 1), 0, ENCODER_MAX_POS);
-    if (newPos != encoderPos)
+    int delta = (digitalRead(DT_PIN) == HIGH ? -1 : 1);
+
+    if (encoderTarget == ENC_CCT)
     {
-      encoderPos = newPos;
-      whiteBrightness = brightnessLUT[encoderPos];
-      if (ledMode == LED_WHITE)
-        ledcWrite(WHITE_LED_CHANNEL, whiteBrightness);
-      publishBrightnessState();
+      int newCctPos = constrain(cctPos - delta, 0, ENCODER_MAX_POS);
+      if (newCctPos != cctPos)
+      {
+        cctPos = newCctPos;
+        applyCCTLight();
+      }
+    }
+    else
+    {
+      int newBrightnessPos = constrain(brightnessPos + delta, 0, ENCODER_MAX_POS);
+      if (newBrightnessPos != brightnessPos)
+      {
+        brightnessPos = newBrightnessPos;
+        whiteBrightness = brightnessLUT[brightnessPos];
+        applyCCTLight();
+        publishBrightnessState();
+      }
     }
   }
   lastClkState = clkState;
@@ -128,25 +142,28 @@ void loop()
         {
           startErrorAnim();
         }
+        awaitingClick = false;
       }
-      else
+      else if (ledMode == LED_RGB_ANIM)
       {
-        // Clear animation LEDs
         hiAnimActive = false;
         FastLED.setBrightness(255);
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = CRGB::Black;
         FastLED.show();
-        if (ledMode == LED_RGB_ANIM)
-        {
-          ledMode = LED_IDLE;
-        }
-        else
-        {
-          ledMode = (ledMode == LED_WHITE) ? LED_IDLE : LED_WHITE;
-          whiteLedChanged = true;
-          publishPowerState();
-        }
+        ledMode = LED_IDLE;
+        awaitingClick = false;
+      }
+      else if (awaitingClick && (millis() - firstClickTime) <= DOUBLE_CLICK_WINDOW)
+      {
+        awaitingClick = false;
+        if (ledMode == LED_CCT)
+          encoderTarget = (encoderTarget == ENC_CCT) ? ENC_BRIGHTNESS : ENC_CCT;
+      }
+      else
+      {
+        awaitingClick = true;
+        firstClickTime = millis();
       }
 
       buttonPressed = false;
@@ -155,10 +172,26 @@ void loop()
     }
   }
 
+  if (awaitingClick && (millis() - firstClickTime) > DOUBLE_CLICK_WINDOW)
+  {
+    awaitingClick = false;
+    ledMode = (ledMode == LED_CCT) ? LED_IDLE : LED_CCT;
+    if (ledMode == LED_CCT)
+      encoderTarget = ENC_BRIGHTNESS;
+    cctChanged = true;
+    publishPowerState();
+  }
+
   if (whiteLedChanged)
   {
     applyWhiteLight();
     whiteLedChanged = false;
+  }
+
+  if (cctChanged)
+  {
+    applyCCTLight();
+    cctChanged = false;
   }
 
   updateErrorAnim();

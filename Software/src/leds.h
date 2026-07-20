@@ -6,15 +6,20 @@
 extern CRGB leds[NUM_LEDS];
 
 // LED mode
-enum LedMode { LED_IDLE, LED_WHITE, LED_RGB_ANIM };
+enum LedMode { LED_IDLE, LED_WHITE, LED_CCT, LED_RGB_ANIM };
 extern LedMode ledMode;
 extern bool whiteLedChanged;
+extern bool cctChanged;
 
 // Encoder / brightness
 extern const uint8_t brightnessLUT[];
-extern int encoderPos;
+extern int brightnessPos;
+extern int cctPos;
 extern int whiteBrightness;
 extern int lastClkState;
+
+enum EncoderTarget { ENC_BRIGHTNESS, ENC_CCT };
+extern EncoderTarget encoderTarget;
 
 // Animation state
 extern bool hiAnimActive;
@@ -23,6 +28,7 @@ extern bool errorAnimActive;
 extern bool apAnimActive;
 
 void applyWhiteLight();
+void applyCCTLight();
 void startErrorAnim();
 void updateHiAnim();
 void updateErrorAnim();
