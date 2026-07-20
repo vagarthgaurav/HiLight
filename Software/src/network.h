@@ -7,5 +7,6 @@ bool isMqttConnected();
 void publishHi();
 void publishPowerState();
 void publishBrightnessState();
+void publishCCTState();
 void startAPMode();
 bool isAPMode();

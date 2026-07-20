@@ -129,10 +129,15 @@ static void publishDiscovery()
   disco += "\"command_topic\":\"hilight/" + deviceId + "/power\",";
   disco += "\"brightness_state_topic\":\"hilight/" + deviceId + "/brightness/state\",";
   disco += "\"brightness_command_topic\":\"hilight/" + deviceId + "/brightness\",";
+  disco += "\"brightness_scale\":255,";
+  disco += "\"color_temp_state_topic\":\"hilight/" + deviceId + "/color_temp/state\",";
+  disco += "\"color_temp_command_topic\":\"hilight/" + deviceId + "/color_temp\",";
+  disco += "\"min_mireds\":" + String(MIN_MIREDS) + ",";
+  disco += "\"max_mireds\":" + String(MAX_MIREDS) + ",";
+  disco += "\"supported_color_modes\":[\"color_temp\"],";
   disco += "\"availability_topic\":\"hilight/" + deviceId + "/availability\",";
   disco += "\"payload_on\":\"ON\",";
-  disco += "\"payload_off\":\"OFF\",";
-  disco += "\"brightness_scale\":255";
+  disco += "\"payload_off\":\"OFF\"";
   disco += "}";
   mqtt.publish("homeassistant/light/" + deviceId + "/config",
                (uint8_t *)disco.c_str(), disco.length(), true, 0);
@@ -146,7 +151,7 @@ static void onMqttConnect()
   mqtt.subscribe("publish/hi", [](const String &payload, const size_t size)
   {
     ledMode = LED_RGB_ANIM;
-    applyWhiteLight();
+    stopWarmLed();
 
     CRGB color = colorForId(payload);
     for (int i = 0; i < NUM_LEDS; i++)
@@ -173,8 +178,10 @@ static void onMqttConnect()
       leds[i] = CRGB::Black;
     FastLED.show();
 
-    ledMode = (payload == "ON") ? LED_WHITE : LED_IDLE;
-    whiteLedChanged = true;
+    ledMode = (payload == "ON") ? LED_CCT : LED_IDLE;
+    if (ledMode == LED_CCT)
+      encoderTarget = ENC_BRIGHTNESS;
+    cctChanged = true;
     publishPowerState();
   });
 
@@ -193,13 +200,24 @@ static void onMqttConnect()
     }
     brightnessPos = nearest;
 
-    if (ledMode == LED_WHITE)
-      whiteLedChanged = true;
+    if (ledMode == LED_CCT)
+      cctChanged = true;
     publishBrightnessState();
+  });
+
+  mqtt.subscribe("hilight/" + deviceId + "/color_temp", [](const String &payload, const size_t size)
+  {
+    int mireds = constrain(payload.toInt(), MIN_MIREDS, MAX_MIREDS);
+    cctPos = map(mireds, MAX_MIREDS, MIN_MIREDS, 0, ENCODER_MAX_POS);
+
+    if (ledMode == LED_CCT)
+      cctChanged = true;
+    publishCCTState();
   });
 
   publishPowerState();
   publishBrightnessState();
+  publishCCTState();
 }
 
 static void setupMQTT()
@@ -447,7 +465,7 @@ void publishPowerState()
   if (!mqtt.isConnected())
     return;
   String stateTopic = "hilight/" + deviceId + "/power/state";
-  const char *payload = (ledMode == LED_WHITE || ledMode == LED_CCT) ? "ON" : "OFF";
+  const char *payload = (ledMode == LED_CCT) ? "ON" : "OFF";
   mqtt.publish(stateTopic, (uint8_t *)payload, strlen(payload), true, 0);
 }
 
@@ -458,5 +476,15 @@ void publishBrightnessState()
   String stateTopic = "hilight/" + deviceId + "/brightness/state";
   int haValue = map(whiteBrightness, brightnessLUT[0], brightnessLUT[ENCODER_MAX_POS], 1, 255);
   String payload = String(haValue);
+  mqtt.publish(stateTopic, (uint8_t *)payload.c_str(), payload.length(), true, 0);
+}
+
+void publishCCTState()
+{
+  if (!mqtt.isConnected())
+    return;
+  String stateTopic = "hilight/" + deviceId + "/color_temp/state";
+  int mireds = map(cctPos, 0, ENCODER_MAX_POS, MAX_MIREDS, MIN_MIREDS);
+  String payload = String(mireds);
   mqtt.publish(stateTopic, (uint8_t *)payload.c_str(), payload.length(), true, 0);
 }

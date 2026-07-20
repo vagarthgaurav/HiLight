@@ -55,6 +55,7 @@ void loop()
       {
         cctPos = newCctPos;
         applyCCTLight();
+        publishCCTState();
       }
     }
     else
@@ -103,7 +104,7 @@ void loop()
       {
         // First frame: set background and brightness
         ledMode = LED_RGB_ANIM;
-        applyWhiteLight();
+        stopWarmLed();
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = bgColor;
         FastLED.setBrightness(SPINNER_BRIGHTNESS);
@@ -180,12 +181,6 @@ void loop()
       encoderTarget = ENC_BRIGHTNESS;
     cctChanged = true;
     publishPowerState();
-  }
-
-  if (whiteLedChanged)
-  {
-    applyWhiteLight();
-    whiteLedChanged = false;
   }
 
   if (cctChanged)

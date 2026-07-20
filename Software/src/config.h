@@ -48,6 +48,10 @@
 // Encoder
 #define ENCODER_MAX_POS 16
 
+// Color temperature (Home Assistant reports/sets this in mireds = 1,000,000/Kelvin)
+#define MIN_MIREDS 153 // ~6500K, full cold
+#define MAX_MIREDS 370 // ~2700K, full warm
+
 // LED rendering
 #define SPINNER_BRIGHTNESS 200
 #define SPINNER_WIDTH 4

@@ -4,7 +4,6 @@
 CRGB leds[NUM_LEDS];
 
 LedMode ledMode = LED_IDLE;
-bool whiteLedChanged = false;
 bool cctChanged = false;
 
 // Gamma-corrected brightness values (gamma=2.2, PWM 5..255 in 17 steps).
@@ -31,22 +30,9 @@ static int otaProgressCount = 0;
 static const CRGB OTA_BG_COLOR = CRGB(255, 220, 60); // light yellow
 static const CRGB OTA_SPIN_COLOR = CRGB(160, 90, 0); // darker amber-yellow
 
-void applyWhiteLight()
+void stopWarmLed()
 {
-  if (ledMode == LED_WHITE)
-  {
-    // White LED on: turn off RGB strip
-    for (int i = 0; i < NUM_LEDS; i++)
-      leds[i] = CRGB::Black;
-    FastLED.show();
-    ledcWrite(WHITE_LED_CHANNEL, whiteBrightness);
-  }
-  else
-  {
-    // White LED off
-    ledcWrite(WHITE_LED_CHANNEL, 0);
-  }
-
+  ledcWrite(WHITE_LED_CHANNEL, 0);
 }
 
 void applyCCTLight()
@@ -94,7 +80,7 @@ void applyCCTLight()
 void startErrorAnim()
 {
   ledMode = LED_RGB_ANIM;
-  applyWhiteLight();
+  stopWarmLed();
   for (int i = 0; i < NUM_LEDS; i++)
     leds[i] = CRGB::Red;
   FastLED.setBrightness(0);
@@ -140,7 +126,7 @@ void updateErrorAnim()
 void startAPAnim()
 {
   ledMode = LED_RGB_ANIM;
-  applyWhiteLight();
+  stopWarmLed();
   for (int i = 0; i < NUM_LEDS; i++)
     leds[i] = CRGB::Orange;
   FastLED.setBrightness(0);
@@ -180,7 +166,7 @@ void updateAPAnim()
 void startOTAAnim()
 {
   ledMode = LED_RGB_ANIM;
-  applyWhiteLight();
+  stopWarmLed();
   hiAnimActive = false;
   errorAnimActive = false;
   apAnimActive = false;
