@@ -40,7 +40,6 @@ static unsigned long apModeStart = 0;
 static bool mqttConnected = false;
 static unsigned long lastMqttAttempt = 0;
 static int mqttRetryCount = 0;
-static bool mqttRetriesExhausted = false;
 
 static String pendingOtaUrl = "";
 
@@ -223,7 +222,6 @@ static void onMqttConnect()
 static void setupMQTT()
 {
   mqttRetryCount = 0;
-  mqttRetriesExhausted = false;
   DBG_PRINTF("[MQTT] Connecting to %s:%d%s\n", broker_host, broker_port, ws_path);
   secureClient.setInsecure();
   webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
@@ -375,10 +373,11 @@ void updateNetwork()
   }
   else if (WiFi.status() == WL_CONNECTED)
   {
-    bool dueForRetry = !mqttConnected && !mqttRetriesExhausted &&
-                       (millis() - lastMqttAttempt >= MQTT_RETRY_INTERVAL);
+    unsigned long retryInterval = (mqttRetryCount < MQTT_MAX_RETRIES) ? MQTT_RETRY_INTERVAL
+                                                                       : MQTT_RETRY_INTERVAL_SLOW;
+    bool dueForRetry = !mqttConnected && (millis() - lastMqttAttempt >= retryInterval);
 
-    if (mqttConnected || dueForRetry)
+    if (mqttConnected)
     {
       webSocket.loop();
       mqtt.update();
@@ -419,25 +418,22 @@ void updateNetwork()
     {
       DBG_PRINTLN("[MQTT] Reconnected");
       mqttConnected = true;
+      mqttRetryCount = 0;
       onMqttConnect();
     }
     else if (!nowConnected)
     {
+      if (mqttConnected)
+        DBG_PRINTLN("[MQTT] Disconnected");
       mqttConnected = false;
       if (dueForRetry)
       {
         lastMqttAttempt = millis();
-        mqttRetryCount++;
-        DBG_PRINTF("[MQTT] Retry %d/%d, ws=%d\n", mqttRetryCount, MQTT_MAX_RETRIES, webSocket.isConnected());
+        if (mqttRetryCount < MQTT_MAX_RETRIES)
+          mqttRetryCount++;
+        DBG_PRINTF("[MQTT] Retry %d/%d\n", mqttRetryCount, MQTT_MAX_RETRIES);
 
-        if (webSocket.isConnected())
-          mqtt.connect(deviceId);
-
-        if (mqttRetryCount >= MQTT_MAX_RETRIES)
-        {
-          DBG_PRINTLN("[MQTT] Retry limit reached, giving up until next WiFi reconnect");
-          mqttRetriesExhausted = true;
-        }
+        mqtt.connect(deviceId);
       }
     }
   }

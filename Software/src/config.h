@@ -16,8 +16,8 @@
 // Pin definitions
 #define BUTTON_PIN 8
 #define WHITE_LED_PIN 4
-#define WHITE_LED_CHANNEL 0    // LEDC channel for white LED
-#define WHITE_LED_FREQ    20000 // 20 kHz — flicker-free at any duty cycle
+#define WHITE_LED_CHANNEL 0  // LEDC channel for white LED
+#define WHITE_LED_FREQ 20000 // 20 kHz — flicker-free at any duty cycle
 #define NUM_LEDS 20
 #define RGB_DATA_PIN 10
 #define CLK_PIN 7 // connected to rotary encoder CLK (OUT A)
@@ -33,7 +33,9 @@
 #define WIFI_CONNECT_TIMEOUT 5000UL
 #define WIFI_RETRY_INTERVAL (5UL * 60UL * 1000UL)
 #define MQTT_RETRY_INTERVAL 5000UL
-#define MQTT_MAX_RETRIES 5 // give up reconnecting after this many failed attempts (until next WiFi reconnect)
+#define MQTT_MAX_RETRIES 5
+#define MQTT_RETRY_INTERVAL_SLOW                                                                   \
+  (5UL * 60UL * 1000UL)                       // after 5 failed attempts, retry every 5 minutes
 #define AP_MODE_TIMEOUT (5UL * 60UL * 1000UL) // auto-exit AP mode after 5 minutes
 
 // Animation timing (ms)
