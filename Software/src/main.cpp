@@ -12,6 +12,7 @@ static int animLedCount = 0;
 static bool apModeTriggered = false;
 static bool awaitingClick = false;
 static unsigned long firstClickTime = 0;
+static bool spinnerPreempted = false;
 
 void setup()
 {
@@ -85,7 +86,14 @@ void loop()
       buttonPressed = true;
       pressStart = millis();
       animLedCount = -1;
+      spinnerPreempted = false;
     }
+
+    // If something else (e.g. an MQTT power command) changed ledMode out from under
+    // us after the spinner claimed it, stop touching leds[] for the rest of this press
+    // so we don't fight over the strip or clobber whatever that writer set on release.
+    if (animLedCount != -1 && ledMode != LED_RGB_ANIM)
+      spinnerPreempted = true;
 
     // Animate spinner during long press (after initial delay): background color + darker spin
     unsigned long elapsed = millis() - pressStart;
@@ -102,7 +110,7 @@ void loop()
       apModeTriggered = true;
     }
 
-    if (targetSpinPos != animLedCount)
+    if (!spinnerPreempted && targetSpinPos != animLedCount)
     {
       CRGB bgColor = colorForId(deviceId);
 
@@ -139,7 +147,12 @@ void loop()
     {
       unsigned long pressDuration = millis() - pressStart;
 
-      if (pressDuration >= LONG_PRESS_TIME)
+      if (spinnerPreempted)
+      {
+        // Whatever preempted the spinner (e.g. MQTT) owns ledMode/leds[] now; don't
+        // treat this release as a click and don't touch the strip.
+      }
+      else if (pressDuration >= LONG_PRESS_TIME)
       {
         if (isMqttConnected())
         {
