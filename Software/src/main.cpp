@@ -13,6 +13,7 @@ static bool apModeTriggered = false;
 static bool awaitingClick = false;
 static unsigned long firstClickTime = 0;
 static bool spinnerPreempted = false;
+static LedMode preSpinnerLedMode = LED_IDLE;
 
 void setup()
 {
@@ -117,6 +118,7 @@ void loop()
       if (animLedCount == -1)
       {
         // First frame: set background and brightness
+        preSpinnerLedMode = ledMode;
         ledMode = LED_RGB_ANIM;
         stopWarmLed();
         for (int i = 0; i < NUM_LEDS; i++)
@@ -166,12 +168,17 @@ void loop()
       }
       else if (ledMode == LED_RGB_ANIM)
       {
+        // Brief touch released before the long-press threshold: cancel the spinner
+        // preview and restore whatever was showing before the press instead of
+        // forcing the light off.
         hiAnimActive = false;
         FastLED.setBrightness(255);
         for (int i = 0; i < NUM_LEDS; i++)
           leds[i] = CRGB::Black;
         FastLED.show();
-        ledMode = LED_IDLE;
+        ledMode = preSpinnerLedMode;
+        if (ledMode == LED_CCT)
+          applyCCTLight();
         awaitingClick = false;
       }
       else if (awaitingClick && (millis() - firstClickTime) <= DOUBLE_CLICK_WINDOW)
