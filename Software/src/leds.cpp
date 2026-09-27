@@ -30,6 +30,20 @@ static int otaProgressCount = 0;
 static const CRGB OTA_BG_COLOR = CRGB(255, 220, 60); // light yellow
 static const CRGB OTA_SPIN_COLOR = CRGB(160, 90, 0); // darker amber-yellow
 
+// Phase-based fade-in/fade-out brightness envelope shared by the hi/error/AP
+// animations: within each phaseDuration-long phase, brightness ramps 0->255
+// (even phase, fade in) or 255->0 (odd phase, fade out).
+static uint8_t fadeEnvelope(unsigned long elapsed, unsigned long phaseDuration)
+{
+  unsigned long phase = elapsed / phaseDuration;
+  unsigned long phaseElapsed = elapsed % phaseDuration;
+
+  if (phase % 2 == 0)
+    return (uint8_t)((phaseElapsed * 255) / phaseDuration); // fade in
+  else
+    return (uint8_t)(255 - (phaseElapsed * 255) / phaseDuration); // fade out
+}
+
 void stopWarmLed()
 {
   ledcWrite(WHITE_LED_PIN, 0);
@@ -109,16 +123,7 @@ void updateErrorAnim()
   }
   else
   {
-    int phase = elapsed / ERROR_FADE_DURATION;
-    unsigned long phaseElapsed = elapsed % ERROR_FADE_DURATION;
-    uint8_t brightness;
-
-    if (phase % 2 == 0)
-      brightness = (uint8_t)((phaseElapsed * 255) / ERROR_FADE_DURATION); // fade in
-    else
-      brightness = (uint8_t)(255 - (phaseElapsed * 255) / ERROR_FADE_DURATION); // fade out
-
-    FastLED.setBrightness(brightness);
+    FastLED.setBrightness(fadeEnvelope(elapsed, ERROR_FADE_DURATION));
     FastLED.show();
   }
 }
@@ -153,13 +158,7 @@ void updateAPAnim()
     return;
 
   unsigned long elapsed = (millis() - apAnimStart) % (AP_FADE_DURATION * 2);
-  uint8_t brightness;
-  if (elapsed < AP_FADE_DURATION)
-    brightness = (uint8_t)((elapsed * 255) / AP_FADE_DURATION);
-  else
-    brightness = (uint8_t)(255 - ((elapsed - AP_FADE_DURATION) * 255) / AP_FADE_DURATION);
-
-  FastLED.setBrightness(brightness);
+  FastLED.setBrightness(fadeEnvelope(elapsed, AP_FADE_DURATION));
   FastLED.show();
 }
 
@@ -214,16 +213,7 @@ void updateHiAnim()
   }
   else
   {
-    int phase = elapsed / HI_FADE_DURATION;
-    unsigned long phaseElapsed = elapsed % HI_FADE_DURATION;
-    uint8_t brightness;
-
-    if (phase % 2 == 0)
-      brightness = (uint8_t)((phaseElapsed * 255) / HI_FADE_DURATION); // fade in
-    else
-      brightness = (uint8_t)(255 - (phaseElapsed * 255) / HI_FADE_DURATION); // fade out
-
-    FastLED.setBrightness(brightness);
+    FastLED.setBrightness(fadeEnvelope(elapsed, HI_FADE_DURATION));
     FastLED.show();
   }
 }
