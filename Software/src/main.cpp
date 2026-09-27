@@ -39,6 +39,13 @@ void loop()
   if (isAPMode())
   {
     updateAPAnim();
+    // loop() returns before the button-release code below ever runs while AP mode is
+    // active, so clear press state every frame here to avoid a stale long-press firing
+    // once AP mode exits.
+    buttonPressed = false;
+    animLedCount = -1;
+    apModeTriggered = false;
+    awaitingClick = false;
     return;
   }
 
