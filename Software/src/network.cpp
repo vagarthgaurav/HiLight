@@ -1,6 +1,7 @@
 #include "network.h"
 #include "config.h"
 #include "device.h"
+#include "homekit.h"
 #include "leds.h"
 #include "ota_pubkey.h"
 #include "secrets.h"
@@ -169,6 +170,49 @@ static void publishDiscovery()
   mqtt.publish(discoveryTopic, (uint8_t *)disco.c_str(), disco.length(), true, 0);
 }
 
+void applyPowerCommand(bool on)
+{
+  hiAnimActive = false;
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = CRGB::Black;
+  FastLED.show();
+
+  ledMode = on ? LED_CCT : LED_IDLE;
+  if (ledMode == LED_CCT)
+    encoderTarget = ENC_BRIGHTNESS;
+  cctChanged = true;
+  publishPowerState();
+}
+
+void applyBrightnessCommand(int haValue)
+{
+  int brightness = map(constrain(haValue, 1, 255), 1, 255, brightnessLUT[0],
+                        brightnessLUT[ENCODER_MAX_POS]);
+  whiteBrightness = brightness;
+
+  // Find the nearest brightness level in the LUT and update brightnessPos accordingly
+  int nearest = 0;
+  for (int i = 1; i <= ENCODER_MAX_POS; i++)
+  {
+    if (abs(brightnessLUT[i] - brightness) < abs(brightnessLUT[nearest] - brightness))
+      nearest = i;
+  }
+  brightnessPos = nearest;
+
+  if (ledMode == LED_CCT)
+    cctChanged = true;
+  publishBrightnessState();
+}
+
+void applyColorTempCommand(int mireds)
+{
+  cctPos = map(constrain(mireds, MIN_MIREDS, MAX_MIREDS), MAX_MIREDS, MIN_MIREDS, 0, ENCODER_MAX_POS);
+
+  if (ledMode == LED_CCT)
+    cctChanged = true;
+  publishCCTState();
+}
+
 static void onMqttConnect()
 {
   mqtt.publish("hilight/" + deviceId + "/availability", (uint8_t *)"online", 6, true, 0);
@@ -198,47 +242,17 @@ static void onMqttConnect()
   {
     if (payload != "ON" && payload != "OFF")
       return;
-
-    hiAnimActive = false;
-    for (int i = 0; i < NUM_LEDS; i++)
-      leds[i] = CRGB::Black;
-    FastLED.show();
-
-    ledMode = (payload == "ON") ? LED_CCT : LED_IDLE;
-    if (ledMode == LED_CCT)
-      encoderTarget = ENC_BRIGHTNESS;
-    cctChanged = true;
-    publishPowerState();
+    applyPowerCommand(payload == "ON");
   });
 
   mqtt.subscribe("hilight/" + deviceId + "/brightness", [](const String &payload, const size_t size)
   {
-    int brightness = map(constrain(payload.toInt(), 1, 255), 1, 255, brightnessLUT[0],
-                         brightnessLUT[ENCODER_MAX_POS]);
-    whiteBrightness = brightness;
-
-    // Find the nearest brightness level in the LUT and update brightnessPos accordingly
-    int nearest = 0;
-    for (int i = 1; i <= ENCODER_MAX_POS; i++)
-    {
-      if (abs(brightnessLUT[i] - brightness) < abs(brightnessLUT[nearest] - brightness))
-        nearest = i;
-    }
-    brightnessPos = nearest;
-
-    if (ledMode == LED_CCT)
-      cctChanged = true;
-    publishBrightnessState();
+    applyBrightnessCommand(payload.toInt());
   });
 
   mqtt.subscribe("hilight/" + deviceId + "/color_temp", [](const String &payload, const size_t size)
   {
-    int mireds = constrain(payload.toInt(), MIN_MIREDS, MAX_MIREDS);
-    cctPos = map(mireds, MAX_MIREDS, MIN_MIREDS, 0, ENCODER_MAX_POS);
-
-    if (ledMode == LED_CCT)
-      cctChanged = true;
-    publishCCTState();
+    applyColorTempCommand(payload.toInt());
   });
 
   publishPowerState();
@@ -404,6 +418,8 @@ void updateNetwork()
   }
   else if (WiFi.status() == WL_CONNECTED)
   {
+    updateHomeKit();
+
     unsigned long retryInterval = (mqttRetryCount < MQTT_MAX_RETRIES) ? MQTT_RETRY_INTERVAL
                                                                        : MQTT_RETRY_INTERVAL_SLOW;
     bool dueForRetry = !mqttConnected && (millis() - lastMqttAttempt >= retryInterval);
@@ -498,30 +514,37 @@ void publishHi()
 
 void publishPowerState()
 {
+  bool on = (ledMode == LED_CCT);
+  homeKitSyncPower(on);
+
   if (!mqtt.isConnected())
     return;
   String stateTopic = "hilight/" + deviceId + "/power/state";
-  const char *payload = (ledMode == LED_CCT) ? "ON" : "OFF";
+  const char *payload = on ? "ON" : "OFF";
   mqtt.publish(stateTopic, (uint8_t *)payload, strlen(payload), true, 0);
 }
 
 void publishBrightnessState()
 {
+  int haValue = map(brightnessLUT[constrain(brightnessPos, 0, ENCODER_MAX_POS)], brightnessLUT[0],
+                     brightnessLUT[ENCODER_MAX_POS], 1, 255);
+  homeKitSyncBrightness(haValue);
+
   if (!mqtt.isConnected())
     return;
   String stateTopic = "hilight/" + deviceId + "/brightness/state";
-  int haValue = map(brightnessLUT[constrain(brightnessPos, 0, ENCODER_MAX_POS)], brightnessLUT[0],
-                     brightnessLUT[ENCODER_MAX_POS], 1, 255);
   String payload = String(haValue);
   mqtt.publish(stateTopic, (uint8_t *)payload.c_str(), payload.length(), true, 0);
 }
 
 void publishCCTState()
 {
+  int mireds = map(cctPos, 0, ENCODER_MAX_POS, MAX_MIREDS, MIN_MIREDS);
+  homeKitSyncColorTemp(mireds);
+
   if (!mqtt.isConnected())
     return;
   String stateTopic = "hilight/" + deviceId + "/color_temp/state";
-  int mireds = map(cctPos, 0, ENCODER_MAX_POS, MAX_MIREDS, MIN_MIREDS);
   String payload = String(mireds);
   mqtt.publish(stateTopic, (uint8_t *)payload.c_str(), payload.length(), true, 0);
 }

@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include "device.h"
+#include "homekit.h"
 #include "leds.h"
 #include "network.h"
 
@@ -26,6 +27,7 @@ void setup()
   FastLED.addLeds<NEOPIXEL, RGB_DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
 
   initNetwork();
+  initHomeKit();
 
   ledcAttach(WHITE_LED_PIN, WHITE_LED_FREQ, WHITE_LED_RES_BITS);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
