@@ -32,7 +32,7 @@ static const CRGB OTA_SPIN_COLOR = CRGB(160, 90, 0); // darker amber-yellow
 
 void stopWarmLed()
 {
-  ledcWrite(WHITE_LED_CHANNEL, 0);
+  ledcWrite(WHITE_LED_PIN, 0);
 }
 
 void applyCCTLight()
@@ -60,7 +60,7 @@ void applyCCTLight()
       coldVal = (int)roundf(sinf(theta) * envelope);
     }
 
-    ledcWrite(WHITE_LED_CHANNEL, constrain(warmVal, 0, 255));
+    ledcWrite(WHITE_LED_PIN, constrain(warmVal, 0, 255));
 
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = CRGB::White;
@@ -69,7 +69,7 @@ void applyCCTLight()
   }
   else
   {
-    ledcWrite(WHITE_LED_CHANNEL, 0);
+    ledcWrite(WHITE_LED_PIN, 0);
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = CRGB::Black;
     FastLED.setBrightness(255);

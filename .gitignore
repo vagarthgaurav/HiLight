@@ -2,3 +2,5 @@
 **/Output
 **/*.zip
 **/.claude/*
+**/.recall/*
+**/.vscode/*

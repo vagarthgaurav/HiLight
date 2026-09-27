@@ -16,7 +16,6 @@
 // Pin definitions
 #define BUTTON_PIN 8
 #define WHITE_LED_PIN 4
-#define WHITE_LED_CHANNEL 0  // LEDC channel for white LED
 #define WHITE_LED_FREQ 20000 // 20 kHz — flicker-free at any duty cycle
 #define NUM_LEDS 20
 #define RGB_DATA_PIN 10

@@ -18,6 +18,23 @@ static const char *broker_host = "mqtt.vagarth.dev";
 static const int broker_port = 443;
 static const char *ws_path = "/mqtt";
 
+// GTS Root R4 — self-signed root for Google Trust Services, which issues the
+// certs for both mqtt.vagarth.dev and hi-light-fw.vagarth.dev. Valid until
+// 2036, so it doesn't need updating as the leaf/intermediate certs rotate.
+static const char *GTS_ROOT_CA = R"(-----BEGIN CERTIFICATE-----
+MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD
+VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG
+A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw
+WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz
+IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi
+AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi
+QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR
+HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
+BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D
+9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8
+p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
+-----END CERTIFICATE-----)";
+
 static DNSServer dnsServer;
 static WiFiClientSecure secureClient;
 static WebSocketsClient webSocket;
@@ -161,7 +178,7 @@ static void onMqttConnect()
     hiAnimStart = millis();
   });
 
-  mqtt.subscribe("hilight/ota", [](const String &url, const size_t size)
+  mqtt.subscribe("hilight/" + deviceId + "/ota", [](const String &url, const size_t size)
   {
     if (url.length() > 0)
       pendingOtaUrl = url;
@@ -223,7 +240,7 @@ static void setupMQTT()
 {
   mqttRetryCount = 0;
   DBG_PRINTF("[MQTT] Connecting to %s:%d%s\n", broker_host, broker_port, ws_path);
-  secureClient.setInsecure();
+  secureClient.setCACert(GTS_ROOT_CA);
   webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
   mqtt.begin(webSocket);
   mqtt.setKeepAliveTimeout(15); // broker declares client dead after ~22s; triggers LWT delivery
@@ -390,7 +407,7 @@ void updateNetwork()
 
       // Clear the retained message on the broker before starting the download
       // so the device does not re-trigger OTA with the stale URL after reboot
-      mqtt.publish("hilight/ota", (uint8_t *)"", 0, true, 0);
+      mqtt.publish("hilight/" + deviceId + "/ota", (uint8_t *)"", 0, true, 0);
 
       startOTAAnim();
       httpUpdate.onProgress([](int current, int total) { advanceOTASpinner(); });
@@ -403,7 +420,7 @@ void updateNetwork()
       });
 
       WiFiClientSecure otaClient;
-      otaClient.setInsecure();
+      otaClient.setCACert(GTS_ROOT_CA);
       t_httpUpdate_return result = httpUpdate.update(otaClient, url);
 
       if (result == HTTP_UPDATE_FAILED)
