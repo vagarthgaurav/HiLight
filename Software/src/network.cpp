@@ -133,7 +133,9 @@ static void loadCredentials()
 static void publishDiscovery()
 {
   String ownerName = nameForId(deviceId);
-  String disco = "{";
+  String disco;
+  disco.reserve(512);
+  disco += "{";
   disco += "\"name\":\"HiLight (" + ownerName + ")\",";
   disco += "\"unique_id\":\"" + deviceId + "\",";
   disco += "\"device\":{";
@@ -277,7 +279,8 @@ void startAPMode()
   WiFi.mode(WIFI_AP_STA);
 
   int n = WiFi.scanNetworks();
-  String scanOptions = "";
+  String scanOptions;
+  scanOptions.reserve(n > 0 ? n * 48 : 0);
   for (int i = 0; i < n; i++)
   {
     String ssid = WiFi.SSID(i);
