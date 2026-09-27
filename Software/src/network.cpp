@@ -490,7 +490,8 @@ void publishBrightnessState()
   if (!mqtt.isConnected())
     return;
   String stateTopic = "hilight/" + deviceId + "/brightness/state";
-  int haValue = map(whiteBrightness, brightnessLUT[0], brightnessLUT[ENCODER_MAX_POS], 1, 255);
+  int haValue = map(brightnessLUT[constrain(brightnessPos, 0, ENCODER_MAX_POS)], brightnessLUT[0],
+                     brightnessLUT[ENCODER_MAX_POS], 1, 255);
   String payload = String(haValue);
   mqtt.publish(stateTopic, (uint8_t *)payload.c_str(), payload.length(), true, 0);
 }
