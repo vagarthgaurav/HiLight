@@ -8,6 +8,10 @@
 #include <MQTTPubSubClient.h>
 // clang-format on
 #include <DNSServer.h>
+#if DEBUG
+#define ESPALEXA_DEBUG // prints Espalexa's internal SSDP/HTTP activity over Serial
+#endif
+#include <Espalexa.h>
 #include <HTTPUpdate.h>
 #include <Preferences.h>
 #include <WebServer.h>
@@ -41,6 +45,12 @@ static WebSocketsClient webSocket;
 static MQTTPubSubClient mqtt;
 static WebServer webServer(80);
 static Preferences prefs;
+
+// Alexa (Hue emulation) — separate WebServer since it lives on port 80 only while
+// on normal STA WiFi, whereas `webServer` above is only bound during AP setup mode.
+static Espalexa espalexa;
+static WebServer alexaServer(80);
+static bool alexaStarted = false;
 
 static String wifiSSID;
 static String wifiPassword;
@@ -161,6 +171,87 @@ static void publishDiscovery()
                (uint8_t *)disco.c_str(), disco.length(), true, 0);
 }
 
+// Shared by the MQTT command subscriptions and the Alexa (Espalexa) callback so both
+// control paths drive the exact same led/state logic.
+static void applyPowerCommand(bool on)
+{
+  hiAnimActive = false;
+  for (int i = 0; i < NUM_LEDS; i++)
+    leds[i] = CRGB::Black;
+  FastLED.show();
+
+  ledMode = on ? LED_CCT : LED_IDLE;
+  if (ledMode == LED_CCT)
+    encoderTarget = ENC_BRIGHTNESS;
+  cctChanged = true;
+  publishPowerState();
+}
+
+static void applyBrightnessCommand(int haBrightness) // 1-255, HA/Alexa scale
+{
+  int brightness = map(constrain(haBrightness, 1, 255), 1, 255, brightnessLUT[0],
+                       brightnessLUT[ENCODER_MAX_POS]);
+  whiteBrightness = brightness;
+
+  // Find the nearest brightness level in the LUT and update brightnessPos accordingly
+  int nearest = 0;
+  for (int i = 1; i <= ENCODER_MAX_POS; i++)
+  {
+    if (abs(brightnessLUT[i] - brightness) < abs(brightnessLUT[nearest] - brightness))
+      nearest = i;
+  }
+  brightnessPos = nearest;
+
+  if (ledMode == LED_CCT)
+    cctChanged = true;
+  publishBrightnessState();
+}
+
+static void applyColorTempCommand(int mireds)
+{
+  mireds = constrain(mireds, MIN_MIREDS, MAX_MIREDS);
+  cctPos = map(mireds, MAX_MIREDS, MIN_MIREDS, 0, ENCODER_MAX_POS);
+
+  if (ledMode == LED_CCT)
+    cctChanged = true;
+  publishCCTState();
+}
+
+static void onAlexaChange(EspalexaDevice *dev)
+{
+  if (dev == nullptr)
+    return;
+
+  DBG_PRINTF("[Alexa] Command: state=%d value=%d ct=%d\n", dev->getState(), dev->getValue(),
+             dev->getCt());
+  applyPowerCommand(dev->getState());
+  if (dev->getState())
+  {
+    applyBrightnessCommand(dev->getValue());
+    applyColorTempCommand(dev->getCt());
+  }
+}
+
+// Called on every transition to a connected STA WiFi link. The first time, this fully
+// registers the Alexa device and starts the HTTP+SSDP stack; on later reconnects (e.g.
+// after AP setup mode released port 80 back to us) it just re-opens the HTTP listener,
+// since Espalexa's device list and SSDP responder don't need to be rebuilt.
+static void initAlexa()
+{
+  if (alexaStarted)
+  {
+    alexaServer.begin();
+    return;
+  }
+
+  String alexaName = String(nameForId(deviceId)) + " Lamp";
+  espalexa.addDevice(alexaName, onAlexaChange, EspalexaDeviceType::whitespectrum);
+  bool ok = espalexa.begin(&alexaServer);
+  DBG_PRINTF("[Alexa] Device '%s' registered, begin() -> %d, IP=%s\n", alexaName.c_str(), ok,
+             WiFi.localIP().toString().c_str());
+  alexaStarted = true;
+}
+
 static void onMqttConnect()
 {
   mqtt.publish("hilight/" + deviceId + "/availability", (uint8_t *)"online", 6, true, 0);
@@ -190,48 +281,14 @@ static void onMqttConnect()
   {
     if (payload != "ON" && payload != "OFF")
       return;
-
-    hiAnimActive = false;
-    for (int i = 0; i < NUM_LEDS; i++)
-      leds[i] = CRGB::Black;
-    FastLED.show();
-
-    ledMode = (payload == "ON") ? LED_CCT : LED_IDLE;
-    if (ledMode == LED_CCT)
-      encoderTarget = ENC_BRIGHTNESS;
-    cctChanged = true;
-    publishPowerState();
+    applyPowerCommand(payload == "ON");
   });
 
   mqtt.subscribe("hilight/" + deviceId + "/brightness", [](const String &payload, const size_t size)
-  {
-    int brightness = map(constrain(payload.toInt(), 1, 255), 1, 255, brightnessLUT[0],
-                         brightnessLUT[ENCODER_MAX_POS]);
-    whiteBrightness = brightness;
-
-    // Find the nearest brightness level in the LUT and update brightnessPos accordingly
-    int nearest = 0;
-    for (int i = 1; i <= ENCODER_MAX_POS; i++)
-    {
-      if (abs(brightnessLUT[i] - brightness) < abs(brightnessLUT[nearest] - brightness))
-        nearest = i;
-    }
-    brightnessPos = nearest;
-
-    if (ledMode == LED_CCT)
-      cctChanged = true;
-    publishBrightnessState();
-  });
+  { applyBrightnessCommand(payload.toInt()); });
 
   mqtt.subscribe("hilight/" + deviceId + "/color_temp", [](const String &payload, const size_t size)
-  {
-    int mireds = constrain(payload.toInt(), MIN_MIREDS, MAX_MIREDS);
-    cctPos = map(mireds, MAX_MIREDS, MIN_MIREDS, 0, ENCODER_MAX_POS);
-
-    if (ledMode == LED_CCT)
-      cctChanged = true;
-    publishCCTState();
-  });
+  { applyColorTempCommand(payload.toInt()); });
 
   publishPowerState();
   publishBrightnessState();
@@ -275,6 +332,8 @@ void initNetwork()
 
 void startAPMode()
 {
+  alexaServer.stop(); // free port 80 for the setup portal below
+
   WiFi.disconnect();
   WiFi.mode(WIFI_AP_STA);
 
@@ -380,6 +439,7 @@ void updateNetwork()
       wifiConnecting = false;
       lastWifiAttempt = millis();
       setupMQTT();
+      initAlexa();
       firstWifiAttempt = false;
     }
     else if (millis() - wifiConnectStart >= WIFI_CONNECT_TIMEOUT)
@@ -396,6 +456,8 @@ void updateNetwork()
   }
   else if (WiFi.status() == WL_CONNECTED)
   {
+    espalexa.loop();
+
     unsigned long retryInterval = (mqttRetryCount < MQTT_MAX_RETRIES) ? MQTT_RETRY_INTERVAL
                                                                        : MQTT_RETRY_INTERVAL_SLOW;
     bool dueForRetry = !mqttConnected && (millis() - lastMqttAttempt >= retryInterval);
