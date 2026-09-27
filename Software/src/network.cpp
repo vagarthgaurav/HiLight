@@ -281,6 +281,9 @@ void startAPMode()
   for (int i = 0; i < n; i++)
   {
     String ssid = WiFi.SSID(i);
+    ssid.replace("&", "&amp;");
+    ssid.replace("<", "&lt;");
+    ssid.replace(">", "&gt;");
     ssid.replace("\"", "&quot;");
     scanOptions += "<option value=\"" + ssid + "\">" + ssid + "</option>\n";
   }
