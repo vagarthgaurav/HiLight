@@ -27,7 +27,7 @@ void setup()
 
   initNetwork();
 
-  ledcAttach(WHITE_LED_PIN, WHITE_LED_FREQ, 8);
+  ledcAttach(WHITE_LED_PIN, WHITE_LED_FREQ, WHITE_LED_RES_BITS);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(CLK_PIN, INPUT_PULLUP);
   pinMode(DT_PIN, INPUT_PULLUP);

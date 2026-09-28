@@ -17,6 +17,9 @@
 #define BUTTON_PIN 8
 #define WHITE_LED_PIN 4
 #define WHITE_LED_FREQ 20000 // 20 kHz — flicker-free at any duty cycle
+#define WHITE_LED_RES_BITS                                                                         \
+  10 // max for 20 kHz: Arduino core clocks LEDC from the 40 MHz XTAL (2^11 > 40 MHz / 20 kHz)
+#define WHITE_LED_MAX_DUTY ((1 << WHITE_LED_RES_BITS) - 1)
 #define NUM_LEDS 20
 #define RGB_DATA_PIN 10
 #define CLK_PIN 7 // connected to rotary encoder CLK (OUT A)

@@ -6,11 +6,13 @@ CRGB leds[NUM_LEDS];
 LedMode ledMode = LED_IDLE;
 bool cctChanged = false;
 
-// Gamma-corrected brightness values (gamma=2.2, PWM 5..255 in 17 steps).
+// Gamma-corrected warm-LED duty values (gamma=2.2, WHITE_LED_RES_BITS PWM, 17 steps).
 // Equal encoder steps produce perceptually equal brightness changes.
 // Flicker-free at all levels because LEDC runs at 20 kHz (see WHITE_LED_FREQ).
-const uint8_t brightnessLUT[] = {  5,   9,  15,  21,  30,  39,  51,  64,  78,
-                                   94, 112, 132, 153, 176, 200, 227, 255};
+// Steps 4..16 are the former 8-bit table scaled by 1023/255; steps 0..3 are extended
+// down to a much dimmer minimum (was 5/255) using the extra PWM resolution.
+const uint16_t brightnessLUT[] = {   3,   15,   38,   73,  120,  156,  205,  257,  313,
+                                   377,  449,  530,  614,  706,  802,  911, 1023};
 int brightnessPos = 0;
 int cctPos = 0;
 int whiteBrightness = brightnessLUT[0];
@@ -60,7 +62,7 @@ void applyCCTLight()
   if (ledMode == LED_CCT)
   {
     // Equal-power crossfade (cos/sin) so neither end looks dimmer than the other.
-    uint8_t envelope = brightnessLUT[constrain(brightnessPos, 0, ENCODER_MAX_POS)];
+    uint16_t envelope = brightnessLUT[constrain(brightnessPos, 0, ENCODER_MAX_POS)];
     int warmVal, coldVal;
 
     if (cctPos <= 0)
@@ -80,11 +82,17 @@ void applyCCTLight()
       coldVal = (int)roundf(sinf(theta) * envelope);
     }
 
-    ledcWrite(WHITE_LED_PIN, constrain(warmVal, 0, 255));
+    ledcWrite(WHITE_LED_PIN, constrain(warmVal, 0, WHITE_LED_MAX_DUTY));
+
+    // The RGB strip is only 8-bit: scale down, but keep any non-zero request lit
+    // so the dimmest steps don't switch the cold side off entirely.
+    int coldBrightness = (coldVal * 255 + WHITE_LED_MAX_DUTY / 2) / WHITE_LED_MAX_DUTY;
+    if (coldVal > 0 && coldBrightness == 0)
+      coldBrightness = 1;
 
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = CRGB::White;
-    FastLED.setBrightness(constrain(coldVal, 0, 255));
+    FastLED.setBrightness(constrain(coldBrightness, 0, 255));
     FastLED.show();
   }
   else

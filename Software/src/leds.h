@@ -11,7 +11,7 @@ extern LedMode ledMode;
 extern bool cctChanged;
 
 // Encoder / brightness
-extern const uint8_t brightnessLUT[];
+extern const uint16_t brightnessLUT[];
 extern int brightnessPos;
 extern int cctPos;
 extern int whiteBrightness;
