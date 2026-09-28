@@ -8,6 +8,7 @@ struct MacColor
   const char *name;
   CRGB color;
   CRGB spinColor;
+  bool haDiscovery; // publish Home Assistant MQTT discovery for this lamp
 };
 
 extern const MacColor macColorTable[];
@@ -17,3 +18,4 @@ extern String deviceId;
 CRGB colorForId(const String &id);
 CRGB spinColorForId(const String &id);
 const char *nameForId(const String &id);
+bool haDiscoveryForId(const String &id);

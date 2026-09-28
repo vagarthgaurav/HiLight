@@ -132,6 +132,14 @@ static void loadCredentials()
 
 static void publishDiscovery()
 {
+  String discoveryTopic = "homeassistant/light/" + deviceId + "/config";
+  if (!haDiscoveryForId(deviceId))
+  {
+    // Clear any retained config from earlier firmware so HA drops the entity
+    mqtt.publish(discoveryTopic, (uint8_t *)"", 0, true, 0);
+    return;
+  }
+
   String ownerName = nameForId(deviceId);
   String disco;
   disco.reserve(512);
@@ -157,8 +165,7 @@ static void publishDiscovery()
   disco += "\"payload_on\":\"ON\",";
   disco += "\"payload_off\":\"OFF\"";
   disco += "}";
-  mqtt.publish("homeassistant/light/" + deviceId + "/config",
-               (uint8_t *)disco.c_str(), disco.length(), true, 0);
+  mqtt.publish(discoveryTopic, (uint8_t *)disco.c_str(), disco.length(), true, 0);
 }
 
 static void onMqttConnect()
