@@ -30,18 +30,24 @@ static int otaProgressCount = 0;
 static const CRGB OTA_BG_COLOR = CRGB(255, 220, 60); // light yellow
 static const CRGB OTA_SPIN_COLOR = CRGB(160, 90, 0); // darker amber-yellow
 
+// Gamma 2.2 correction so linear ramps look perceptually linear (same gamma as brightnessLUT).
+static uint8_t gamma8(uint8_t v)
+{
+  return (uint8_t)(powf(v / 255.0f, 2.2f) * 255.0f + 0.5f);
+}
+
 // Phase-based fade-in/fade-out brightness envelope shared by the hi/error/AP
-// animations: within each phaseDuration-long phase, brightness ramps 0->255
-// (even phase, fade in) or 255->0 (odd phase, fade out).
+// animations: within each phaseDuration-long phase, perceived brightness ramps
+// 0->255 (even phase, fade in) or 255->0 (odd phase, fade out).
 static uint8_t fadeEnvelope(unsigned long elapsed, unsigned long phaseDuration)
 {
   unsigned long phase = elapsed / phaseDuration;
   unsigned long phaseElapsed = elapsed % phaseDuration;
 
   if (phase % 2 == 0)
-    return (uint8_t)((phaseElapsed * 255) / phaseDuration); // fade in
+    return gamma8((phaseElapsed * 255) / phaseDuration); // fade in
   else
-    return (uint8_t)(255 - (phaseElapsed * 255) / phaseDuration); // fade out
+    return gamma8(255 - (phaseElapsed * 255) / phaseDuration); // fade out
 }
 
 void stopWarmLed()
