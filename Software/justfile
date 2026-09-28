@@ -17,4 +17,4 @@ deploy:
     scp .pio/build/esp32-c3-devkitc-02/firmware.bin vagarth@vagarth-server:/home/vagarth/hi-light-firmware/firmware.bin
 
 ota device_id:
-    mqttx pub -h mqtt.vagarth.dev -p 443 -l wss --path /mqtt -t "hilight/{{device_id}}/ota" -m "https://hi-light-fw.vagarth.dev/firmware.bin?t=$(date +%s)"
+    mqttx pub -u admin -P "$MQTT_ADMIN_PASSWORD" -h mqtt.vagarth.dev -p 443 -l wss --path /mqtt -t "hilight/{{device_id}}/ota" -m "https://hi-light-fw.vagarth.dev/firmware.bin?t=$(date +%s)"

@@ -2,6 +2,7 @@
 #include "config.h"
 #include "device.h"
 #include "leds.h"
+#include "secrets.h"
 // clang-format off
 // WebSocketsClient.h must be included before MQTTPubSubClient.h
 #include <WebSocketsClient.h>
@@ -36,7 +37,6 @@ p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
 -----END CERTIFICATE-----)";
 
 static DNSServer dnsServer;
-static WiFiClientSecure secureClient;
 static WebSocketsClient webSocket;
 static MQTTPubSubClient mqtt;
 static WebServer webServer(80);
@@ -249,13 +249,13 @@ static void setupMQTT()
 {
   mqttRetryCount = 0;
   DBG_PRINTF("[MQTT] Connecting to %s:%d%s\n", broker_host, broker_port, ws_path);
-  secureClient.setCACert(GTS_ROOT_CA);
-  webSocket.beginSSL(broker_host, broker_port, ws_path, "", "mqtt");
+  // beginSSL() with no CA silently falls back to setInsecure(); always pass the root.
+  webSocket.beginSslWithCA(broker_host, broker_port, ws_path, GTS_ROOT_CA, "mqtt");
   mqtt.begin(webSocket);
   mqtt.setKeepAliveTimeout(15); // broker declares client dead after ~22s; triggers LWT delivery
   mqtt.setWill("hilight/" + deviceId + "/availability", "offline", true, 0);
 
-  if (mqtt.connect(deviceId))
+  if (mqtt.connect(deviceId, MQTT_USERNAME, MQTT_PASSWORD))
   {
     DBG_PRINTLN("[MQTT] Connected");
     mqttConnected = true;
@@ -463,7 +463,7 @@ void updateNetwork()
           mqttRetryCount++;
         DBG_PRINTF("[MQTT] Retry %d/%d\n", mqttRetryCount, MQTT_MAX_RETRIES);
 
-        mqtt.connect(deviceId);
+        mqtt.connect(deviceId, MQTT_USERNAME, MQTT_PASSWORD);
       }
     }
   }
