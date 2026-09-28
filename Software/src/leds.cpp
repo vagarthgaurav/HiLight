@@ -195,6 +195,14 @@ void startOTAAnim()
   FastLED.show();
 }
 
+// Leave the OTA spinner without a reboot (failed/rejected update) and restore the light.
+// Transient animation modes aren't restored; they fall back to idle.
+void endOTAAnim(LedMode restoreMode)
+{
+  ledMode = (restoreMode == LED_CCT) ? LED_CCT : LED_IDLE;
+  applyCCTLight(); // renders the CCT light, or switches everything off when idle
+}
+
 void advanceOTASpinner()
 {
   otaProgressCount++;

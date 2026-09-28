@@ -35,4 +35,5 @@ void startAPAnim();
 void stopAPAnim();
 void updateAPAnim();
 void startOTAAnim();
+void endOTAAnim(LedMode restoreMode);
 void advanceOTASpinner();

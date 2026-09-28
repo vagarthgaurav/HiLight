@@ -1,3 +1,6 @@
+set dotenv-load
+set shell := ["bash", "-c"]
+
 pio := "/home/vagarth/.platformio/penv/bin/pio"
 
 build:
@@ -12,9 +15,22 @@ monitor:
 upload-monitor:
     {{pio}} run --target upload && {{pio}} device monitor
 
-deploy:
-    {{pio}} run
-    scp .pio/build/esp32-c3-devkitc-02/firmware.bin vagarth@vagarth-server:/home/vagarth/hi-light-firmware/firmware.bin
+signing_tool := "/home/vagarth/.platformio/packages/framework-arduinoespressif32/tools/bin_signing.py"
+python := "/home/vagarth/.platformio/penv/bin/python"
+signing_key := env_var_or_default("OTA_SIGNING_KEY", "/home/vagarth/.config/hilight/ota_signing_key.pem")
+built_bin := ".pio/build/esp32-c3-devkitc-02/firmware.bin"
+signed_bin := ".pio/build/esp32-c3-devkitc-02/firmware.signed.bin"
+
+# Sign the built firmware for OTA (ECDSA P-256 / SHA-256, signature appended)
+sign: build
+    {{python}} {{signing_tool}} --bin {{built_bin}} --key {{signing_key}} --out {{signed_bin}}
+
+# Check the signed image against the public key embedded in the firmware
+verify-signed: sign
+    {{python}} {{signing_tool}} --verify {{signed_bin}} --pubkey <(sed -n '/BEGIN PUBLIC KEY/,/END PUBLIC KEY/p' src/ota_pubkey.h | sed 's/^static.*R"(//')
+
+deploy: verify-signed
+    scp {{signed_bin}} vagarth@vagarth-server:/home/vagarth/hi-light-firmware/firmware.bin
 
 ota device_id:
     mqttx pub -u admin -P "$MQTT_ADMIN_PASSWORD" -h mqtt.vagarth.dev -p 443 -l wss --path /mqtt -t "hilight/{{device_id}}/ota" -m "https://hi-light-fw.vagarth.dev/firmware.bin?t=$(date +%s)"

@@ -2,6 +2,7 @@
 #include "config.h"
 #include "device.h"
 #include "leds.h"
+#include "ota_pubkey.h"
 #include "secrets.h"
 // clang-format off
 // WebSocketsClient.h must be included before MQTTPubSubClient.h
@@ -422,6 +423,15 @@ void updateNetwork()
       // so the device does not re-trigger OTA with the stale URL after reboot
       mqtt.publish("hilight/" + deviceId + "/ota", (uint8_t *)"", 0, true, 0);
 
+      // Only flash images signed with our key. The signature is checked after the
+      // full download and before the boot partition is switched, so a bad image
+      // is discarded and the running firmware keeps booting.
+      static UpdaterECDSAVerifier otaVerifier((const uint8_t *)OTA_PUBLIC_KEY,
+                                              sizeof(OTA_PUBLIC_KEY)); // incl. NUL for PEM parse
+      if (!Update.installSignature(&otaVerifier))
+        return;
+
+      LedMode preOtaMode = ledMode;
       startOTAAnim();
       httpUpdate.onProgress([](int current, int total) { advanceOTASpinner(); });
       httpUpdate.onEnd([]()
@@ -434,12 +444,12 @@ void updateNetwork()
 
       WiFiClientSecure otaClient;
       otaClient.setCACert(GTS_ROOT_CA);
-      t_httpUpdate_return result = httpUpdate.update(otaClient, url);
+      httpUpdate.update(otaClient, url);
 
-      if (result == HTTP_UPDATE_FAILED)
-        startErrorAnim();
-      // HTTP_UPDATE_NO_UPDATES: silently ignore (not an error)
-      // HTTP_UPDATE_OK: device was rebooted by httpUpdate, never reached
+      // HTTP_UPDATE_OK reboots and never gets here, so reaching this point means the
+      // update failed or was rejected (e.g. bad signature). Failures are deliberately
+      // silent: put the lamp back the way it was instead of flashing an error at users.
+      endOTAAnim(preOtaMode);
       return;
     }
 
