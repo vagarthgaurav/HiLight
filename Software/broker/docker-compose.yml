@@ -1,0 +1,23 @@
+name: HiLight-Mqtt
+services:
+    eclipse-mosquitto:
+        container_name: HiLight-mosquitto
+        # No host port mapping: only the reverse proxy on shared_network needs
+        # to reach 9001, and a published port would expose plain ws to the LAN.
+        expose:
+            - '9001'
+            - '1883'
+        restart: always
+        volumes:
+            - /home/vagarth/HiLight-mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+            - /home/vagarth/HiLight-mosquitto/passwd:/mosquitto/config/passwd:ro
+            - /home/vagarth/HiLight-mosquitto/acl:/mosquitto/config/acl:ro
+            - /home/vagarth/HiLight-mosquitto/data:/mosquitto/data
+        image: eclipse-mosquitto:2
+        networks:
+            - shared
+
+networks:
+  shared:
+    external: true
+    name: shared_network

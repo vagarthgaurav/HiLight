@@ -1,0 +1,24 @@
+# admin: mqttx / Home Assistant / justfile ota recipe
+user admin
+topic readwrite #
+
+# cloud: HiLight-cloud (Alexa + Google Home). Reads state, sends commands.
+# No access to the ota topic, so a compromised cloud service can't flash lamps.
+user cloud
+topic read hilight/+/power/state
+topic read hilight/+/brightness/state
+topic read hilight/+/color_temp/state
+topic read hilight/+/availability
+topic write hilight/+/power
+topic write hilight/+/brightness
+topic write hilight/+/color_temp
+
+# device: shared by all lamps (compiled into firmware.bin via secrets.h).
+# %c is the MQTT client id, which the firmware sets to its own deviceId, so a
+# lamp is confined to its own subtree, its own Home Assistant discovery topic,
+# and the shared "hi" channel.
+user device
+pattern readwrite hilight/%c/#
+pattern write homeassistant/light/%c/config
+topic readwrite publish/hi
+topic write client/connected
