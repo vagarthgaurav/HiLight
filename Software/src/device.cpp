@@ -3,7 +3,7 @@
 String deviceId;
 
 const MacColor macColorTable[] = {
-    {"HiLight_7C2C670B8348", "Alexandra & Gabriel", CRGB::OrangeRed, CRGB::DarkRed, false},
+    {"HiLight_7C2C670B6C7C", "Alexandra & Gabriel", CRGB::OrangeRed, CRGB::DarkRed, false},
     {"HiLight_7C2C670B9FF0", "Jutta & Patrick", CRGB::ForestGreen, CRGB::DarkGreen, false},
     {"HiLight_7C2C670B9208", "Sabrina & Vagarth", CRGB::Turquoise, CRGB::DarkBlue, true},
     {"HiLight_7C2C670B9390", "Vagarth Test", CRGB::DeepPink, CRGB::DarkRed, true},
