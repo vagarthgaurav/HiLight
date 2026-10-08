@@ -179,7 +179,7 @@ static void onMqttConnect()
     ledMode = LED_RGB_ANIM;
     stopWarmLed();
 
-    CRGB color = colorForId(payload);
+    CRGB color = gammaColor(colorForId(payload));
     for (int i = 0; i < NUM_LEDS; i++)
       leds[i] = color;
     FastLED.setBrightness(0);

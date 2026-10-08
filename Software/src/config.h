@@ -57,5 +57,6 @@
 #define MAX_MIREDS 370 // ~2700K, full warm
 
 // LED rendering
+#define RGB_GAMMA 2.2f // gamma for RGB colours and fades (warm LED table and brightnessLUT use 2.2)
 #define SPINNER_BRIGHTNESS 200
 #define SPINNER_WIDTH 4

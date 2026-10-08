@@ -113,7 +113,7 @@ void loop()
 
     if (!spinnerPreempted && targetSpinPos != animLedCount)
     {
-      CRGB bgColor = colorForId(deviceId);
+      CRGB bgColor = gammaColor(colorForId(deviceId));
 
       if (animLedCount == -1)
       {
@@ -128,7 +128,7 @@ void loop()
 
       if (targetSpinPos >= 0)
       {
-        CRGB spColor = spinColorForId(deviceId);
+        CRGB spColor = gammaColor(spinColorForId(deviceId));
 
         // Restore previous spinner position to background
         if (animLedCount >= 0)

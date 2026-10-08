@@ -32,10 +32,16 @@ static int otaProgressCount = 0;
 static const CRGB OTA_BG_COLOR = CRGB(255, 220, 60); // light yellow
 static const CRGB OTA_SPIN_COLOR = CRGB(160, 90, 0); // darker amber-yellow
 
-// Gamma 2.2 correction so linear ramps look perceptually linear (same gamma as brightnessLUT).
+// Gamma correction (RGB_GAMMA) so linear ramps look perceptually linear.
 static uint8_t gamma8(uint8_t v)
 {
-  return (uint8_t)(powf(v / 255.0f, 2.2f) * 255.0f + 0.5f);
+  return (uint8_t)(powf(v / 255.0f, RGB_GAMMA) * 255.0f + 0.5f);
+}
+
+// Gamma-correct a colour so it looks on the strip like the same RGB value on a screen.
+CRGB gammaColor(const CRGB &c)
+{
+  return CRGB(gamma8(c.r), gamma8(c.g), gamma8(c.b));
 }
 
 // Phase-based fade-in/fade-out brightness envelope shared by the hi/error/AP

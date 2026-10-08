@@ -26,6 +26,7 @@ extern unsigned long hiAnimStart;
 extern bool errorAnimActive;
 extern bool apAnimActive;
 
+CRGB gammaColor(const CRGB &c);
 void stopWarmLed();
 void applyCCTLight();
 void startErrorAnim();
